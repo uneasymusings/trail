@@ -15,6 +15,7 @@ let usage = """
       trail enrich [n]           Write notes for n files with the on-device model (default 25)
       trail stats                Index size and model status
       trail compact              Fold bulky generated folders into single entries, reclaim space
+      trail inbox                New files on the Desktop and in Downloads, and where each belongs
 
     Data lives in ~/Library/Application Support/Trail (override with TRAIL_HOME).
     """
@@ -52,9 +53,12 @@ func printResponse(_ response: SearchResponse, elapsed: TimeInterval) {
     var description = ["keywords: \(plan.keywords.joined(separator: ", "))"]
     if !plan.kinds.isEmpty { description.append("kind: \(plan.kinds.map(\.rawValue).joined(separator: ", "))") }
     if plan.timeframe != .any { description.append("time: \(plan.timeframe.rawValue)") }
+    if let days = plan.days { description.append(days.lowerBound == days.upperBound ? "\(days.lowerBound) days ago" : "\(days.lowerBound)–\(days.upperBound) days ago") }
+    if let size = plan.size { description.append(size > 0 ? "big first" : "small first") }
     if let origin = plan.origin { description.append("origin: \(origin.rawValue)") }
     if plan.newestFirst { description.append("newest first") }
-    print("\(dim)\(description.joined(separator: " · "))\(response.refinedByModel ? " · read by model" : "") · \(Int(elapsed * 1000)) ms\(reset)\n")
+    print("\(dim)\(description.joined(separator: " · "))\(response.refinedByModel ? " · read by model" : "")\(response.pickedByModel ? " · chosen by model" : "") · \(Int(elapsed * 1000)) ms\(reset)\n")
+    if let corrected = response.correctedText { print("\(dim)Showing results for\(reset) \(corrected)\n") }
     if let answer = response.answer { print("\(cyan)→ \(answer)\(reset)\n") }
     for project in response.projects {
         print("\(bold)▸ \(project.name)\(reset) \(dim)project · \(project.fileCount) files · active \(RelativeTime.describe(project.lastActive))\(reset)")
@@ -121,6 +125,12 @@ func run() async {
         try? engine.indexer.prune()
         engine.markFirstScanComplete(eventID: eventID)
         print("\nIndexed \(count) files in \(String(format: "%.1f", Date().timeIntervalSince(start))) s.")
+        let readStart = Date()
+        let read = engine.readAllDocuments { total in
+            print("\r\u{1B}[KReading documents · \(total)", terminator: "")
+            fflush(stdout)
+        }
+        print("\r\u{1B}[KRead \(read) documents in \(String(format: "%.1f", Date().timeIntervalSince(readStart))) s.")
 
     case "watch":
         print("Watching \(engine.config.roots.joined(separator: ", ")) — Ctrl-C to stop.")
@@ -150,6 +160,21 @@ func run() async {
         let after = engine.stats()
         let format = { (bytes: Int) in ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file) }
         print("\(before.files) → \(after.files) entries · \(format(before.databaseBytes)) → \(format(after.databaseBytes))")
+
+    case "inbox":
+        let items = (try? await engine.refreshInboxNow()) ?? []
+        if items.isEmpty { print("Nothing new on the Desktop or in Downloads.") }
+        for item in items {
+            print("\(bold)\(item.file.name)\(reset)  \(dim)\(item.file.displayPath) · arrived \(RelativeTime.describe(item.arrived))\(reset)")
+            if let gist = item.gist { print("  \(dim)\(gist.prefix(100))\(reset)") }
+            if let best = item.suggestion {
+                print("  \(cyan)→ \(best.displayPath)\(reset)  \(dim)\(best.reason)\(best.byModel ? " · chosen by model" : "")\(reset)")
+                for other in item.destinations.dropFirst() { print("    \(dim)or \(other.displayPath)\(reset)") }
+            } else {
+                print("  \(dim)No obvious home yet\(reset)")
+            }
+            print()
+        }
 
     case "stats":
         let stats = engine.stats()

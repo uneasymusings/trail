@@ -1,0 +1,8 @@
+{ "steps": [
+  { "wait": 5.5, "map": "show" },
+  { "wait": 2.8, "map": "Thermal" },
+  { "wait": 2.2, "map": "Lisbon trip" },
+  { "wait": 2.2, "map": "Downloads" },
+  { "wait": 2.2, "map": "none" },
+  { "wait": 1.5 }
+] }

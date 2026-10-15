@@ -1,7 +1,9 @@
 { "steps": [
   { "wait": 5.5, "show": true },
-  { "wait": 2.4, "type": "pdfs I downloaded about taxes" },
-  { "wait": 3.4, "clear": true },
-  { "wait": 0.4, "type": "what was I working on today?" },
-  { "wait": 5.5, "hide": true }
+  { "wait": 2.0, "type": "that big file I downloaded a couple of days ago" },
+  { "wait": 4.2, "clear": true },
+  { "wait": 0.4, "type": "the deck we're sending to investors" },
+  { "wait": 4.6, "key": "down" },
+  { "wait": 0.6, "key": "up" },
+  { "wait": 1.2, "hide": true }
 ] }

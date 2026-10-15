@@ -35,7 +35,15 @@ struct SettingsView: View {
                 Toggle("Write short notes about new files", isOn: Binding(
                     get: { model.config.enrichWithModel },
                     set: { value in model.updateConfig { $0.enrichWithModel = value } }))
-                Text("Notes and tags make files findable by what's in them. They're written on this Mac, slowly, when it's idle and plugged in.")
+                Text("Notes and tags make files findable by what's in them. They're written on this Mac, slowly, while you're away from the keyboard, and never in Low Power Mode.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Section("New files") {
+                Toggle("Suggest where new files belong", isOn: Binding(
+                    get: { model.config.suggestHomes },
+                    set: { value in model.updateConfig { $0.suggestHomes = value } }))
+                Text("New screenshots and downloads on the Desktop and in Downloads get a suggested folder, and the menu bar shows how many are waiting. Nothing moves until you say so.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
