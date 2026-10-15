@@ -15,6 +15,14 @@ final class AppModel {
     private(set) var hasFullDiskAccess = AppModel.checkFullDiskAccess()
     private(set) var recentProjects: [ProjectSummary] = []
     private(set) var config: TrailConfig = .default
+    /// New files on the Desktop and in Downloads waiting to be sorted (shown on the menu bar).
+    private(set) var inboxCount = 0
+    /// Bumps whenever the engine reports a change, so open panels can reload.
+    private(set) var changes = 0
+    /// Opens the sort panel (set by the app delegate).
+    var showSort: (() -> Void)?
+    /// Opens the map window.
+    var showMap: (() -> Void)?
 
     var onHotKeyChange: (() -> Void)?
     /// Called once the first full scan has finished and fresh stats are in.
@@ -39,12 +47,20 @@ final class AppModel {
             modelStatus = engine.intelligence.status
             engine.start()
             refresh(force: true)
+            // Files settle into the count over time, without any event to say so.
+            Task { [weak self] in
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(60))
+                    self?.refreshInboxCount()
+                }
+            }
         } catch {
             startupError = "Couldn't open the index: \(error)"
         }
     }
 
     private func engineChanged() {
+        changes += 1
         refresh()
         if Date().timeIntervalSince(lastWidgetReload) > 120 {
             lastWidgetReload = Date()
@@ -60,6 +76,7 @@ final class AppModel {
         phase = engine.phase
         hasFullDiskAccess = Self.checkFullDiskAccess()
         modelStatus = engine.intelligence.status
+        refreshInboxCount()
         guard force || finishedScan || Date().timeIntervalSince(lastStatsRefresh) > 3 else { return }
         lastStatsRefresh = Date()
         Task.detached(priority: .utility) {
@@ -70,6 +87,14 @@ final class AppModel {
                 self.recentProjects = projects
                 if finishedScan { self.onScanFinished?() }
             }
+        }
+    }
+
+    func refreshInboxCount() {
+        guard let engine else { return }
+        Task.detached(priority: .utility) {
+            let count = engine.config.suggestHomes ? engine.inbox.count() : 0
+            await MainActor.run { if self.inboxCount != count { self.inboxCount = count } }
         }
     }
 
@@ -108,6 +133,7 @@ final class AppModel {
             NSSound.beep()
             return
         }
+        engine?.recordOpen(known)
         if reveal || [.app, .code, .archive].contains(known.kind) {
             NSWorkspace.shared.activateFileViewerSelecting([url])
         } else {

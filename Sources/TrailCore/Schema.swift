@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 2
+    static let version = 4
 
     /// The knowledge graph: files, projects, tags and activity events, plus a full-text index.
     /// Edges are columns (`project_id`, `chain_id`) and join tables (`file_tags`) rather than a
@@ -70,24 +70,55 @@ enum Schema {
         );
         """
 
-    /// v2: English stemming in the search index, so "taxes" finds "tax" and "flights" finds "flight".
-    static let v2 = """
+    /// v3: what's inside documents becomes searchable, in its own `body` index so that matching
+    /// names stays fast. Both indexes store only the index, not a second copy of the text
+    /// (`contentless_delete`), which keeps them small. Also tracks when a file's text was read
+    /// and how often it was opened from Trail. (Stemming, so "taxes" finds "tax", came in v2.)
+    static let v3 = """
         DROP TABLE IF EXISTS search;
         CREATE VIRTUAL TABLE search USING fts5(
             name, terms, summary, tags, project,
+            content = '', contentless_delete = 1, prefix = '2 3',
             tokenize = "porter unicode61 remove_diacritics 2"
         );
+        CREATE VIRTUAL TABLE body USING fts5(
+            text,
+            content = '', contentless_delete = 1,
+            tokenize = "porter unicode61 remove_diacritics 2"
+        );
+        CREATE VIRTUAL TABLE search_terms USING fts5vocab(search, row);
+        CREATE VIRTUAL TABLE body_terms USING fts5vocab(body, row);
+        ALTER TABLE files ADD COLUMN read_at REAL;
+        ALTER TABLE files ADD COLUMN opens INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE files ADD COLUMN opened_at REAL;
+        CREATE INDEX files_unread ON files(modified DESC) WHERE read_at IS NULL AND deleted_at IS NULL;
+        INSERT INTO meta (key, value) VALUES ('search_rebuild', '1')
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+        """
+
+    /// v4: app names ("blender" for .blend files) join the indexed terms, and the inbox of new
+    /// loose files on the Desktop and in Downloads, with where each probably belongs.
+    static let v4 = """
+        CREATE TABLE IF NOT EXISTS inbox (
+            file_id INTEGER PRIMARY KEY REFERENCES files(id) ON DELETE CASCADE,
+            arrived REAL NOT NULL,
+            status TEXT NOT NULL DEFAULT 'waiting',
+            destinations TEXT,
+            gist TEXT,
+            read_at REAL,
+            destination TEXT,
+            decided_at REAL
+        );
+        CREATE INDEX IF NOT EXISTS inbox_status ON inbox(status, arrived DESC);
         INSERT INTO meta (key, value) VALUES ('search_rebuild', '1')
             ON CONFLICT(key) DO UPDATE SET value = excluded.value;
         """
 
     static func migrate(_ db: Database) throws {
         let current = try db.scalarInt("PRAGMA user_version") ?? 0
-        if current < 1 {
-            try db.exec(v1)
-        } else if current < 2 {
-            try db.exec(v2)
-        }
+        if current < 1 { try db.exec(v1) }
+        if current < 3 { try db.exec(v3) }
+        if current < 4 { try db.exec(v4) }
         if current < version { try db.exec("PRAGMA user_version = \(version)") }
     }
 }

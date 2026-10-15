@@ -3,28 +3,44 @@ import Foundation
 import PDFKit
 import Vision
 
-/// Pulls a short excerpt out of a file for the model to summarize. Never reads more than it needs.
+/// Pulls text out of files: a short excerpt for the model to summarize, and a longer, cheaper
+/// one for the search index. Never reads more than it needs.
 enum TextExtractor {
     static let maxCharacters = 2_400
+    static let maxBodyCharacters = 6_000
 
-    static func excerpt(path: String, kind: FileKind) -> String? {
+    /// Kinds whose text goes into the search index. Images need OCR, which is slow, so they're
+    /// left to the model's notes; code is left to the editor.
+    static let readableKinds: [FileKind] = [.document, .pdf, .text, .presentation, .spreadsheet]
+
+    static func excerpt(path: String, kind: FileKind, accurate: Bool = false) -> String? {
+        text(path: path, kind: kind, limit: maxCharacters, recognizeImages: true, accurate: accurate)
+    }
+
+    /// The beginning of a document, for full-text search.
+    static func body(path: String, kind: FileKind) -> String? {
+        guard readableKinds.contains(kind) else { return nil }
+        return text(path: path, kind: kind, limit: maxBodyCharacters, recognizeImages: false)
+    }
+
+    private static func text(path: String, kind: FileKind, limit: Int, recognizeImages: Bool, accurate: Bool = false) -> String? {
         let url = URL(fileURLWithPath: path)
         let ext = url.pathExtension.lowercased()
         let text: String? = switch kind {
-        case .pdf: pdfText(url)
+        case .pdf: pdfText(url, limit: limit)
         case .text, .code, .data: plainText(url)
         case .document: documentText(url, ext: ext)
         case .presentation where ext == "pptx": zippedText(url, entries: "ppt/slides/slide*.xml", tag: "a:t")
         case .spreadsheet where ext == "xlsx": zippedText(url, entries: "xl/sharedStrings.xml", tag: "t")
         case .spreadsheet where ext == "csv": plainText(url)
-        case .image: imageText(url)
+        case .image where recognizeImages: imageText(url, accurate: accurate)
         default: nil
         }
         guard let text else { return nil }
         let squeezed = text
             .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        return squeezed.count < 12 ? nil : String(squeezed.prefix(maxCharacters))
+        return squeezed.count < 12 ? nil : String(squeezed.prefix(limit))
     }
 
     private static func plainText(_ url: URL) -> String? {
@@ -36,12 +52,12 @@ enum TextExtractor {
         return String(decoding: data, as: UTF8.self)
     }
 
-    private static func pdfText(_ url: URL) -> String? {
+    private static func pdfText(_ url: URL, limit: Int) -> String? {
         guard let document = PDFDocument(url: url) else { return nil }
         var text = ""
         for index in 0..<min(document.pageCount, 3) {
             text += (document.page(at: index)?.string ?? "") + "\n"
-            if text.count > maxCharacters { break }
+            if text.count > limit { break }
         }
         return text
     }
@@ -72,14 +88,22 @@ enum TextExtractor {
     }
 
     /// Text in screenshots and scans, via on-device OCR. Photos usually have none and return nil.
-    private static func imageText(_ url: URL) -> String? {
+    /// Large images are scaled down first: text stays readable and Vision needs far less memory.
+    private static func imageText(_ url: URL, accurate: Bool) -> String? {
         guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize, size < 25_000_000 else { return nil }
-        let request = VNRecognizeTextRequest()
-        request.recognitionLevel = .fast
-        request.usesLanguageCorrection = false
-        let handler = VNImageRequestHandler(url: url)
-        guard (try? handler.perform([request])) != nil else { return nil }
-        let lines = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
-        return lines.count < 2 ? nil : lines.joined(separator: " ")
+        return autoreleasepool {
+            guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+                  let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                      kCGImageSourceCreateThumbnailFromImageAlways: true,
+                      kCGImageSourceThumbnailMaxPixelSize: 2_048,
+                      kCGImageSourceCreateThumbnailWithTransform: true,
+                  ] as CFDictionary) else { return nil }
+            let request = VNRecognizeTextRequest()
+            request.recognitionLevel = accurate ? .accurate : .fast
+            request.usesLanguageCorrection = accurate
+            guard (try? VNImageRequestHandler(cgImage: image).perform([request])) != nil else { return nil }
+            let lines = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
+            return lines.count < 2 ? nil : lines.joined(separator: " ")
+        }
     }
 }

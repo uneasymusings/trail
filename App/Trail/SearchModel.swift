@@ -121,6 +121,7 @@ final class SearchModel {
     }
 
     func open(_ file: FileRecord, reveal: Bool = false) {
+        app.engine?.recordOpen(file)
         if reveal || file.kind == .app {
             NSWorkspace.shared.activateFileViewerSelecting([file.url])
         } else {

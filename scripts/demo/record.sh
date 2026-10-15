@@ -10,9 +10,9 @@ cd "$(dirname "$0")/../.."
 APP="build/Build/Products/Release/Trail.app"
 DEMO="$PWD/.demo"
 OUT="docs/media"
-if [[ $# -gt 0 ]]; then scenes=("$@"); else scenes=(search ask first-run); fi
-length() { case "$1" in search) echo 20 ;; ask) echo 22 ;; *) echo 13 ;; esac; }
-stage() { case "$1" in first-run) echo "380 140" ;; *) echo "900 620" ;; esac; }
+if [[ $# -gt 0 ]]; then scenes=("$@"); else scenes=(search ask sort map first-run); fi
+length() { case "$1" in search) echo 20 ;; ask) echo 25 ;; sort) echo 24 ;; map) echo 19 ;; *) echo 13 ;; esac; }
+stage() { case "$1" in first-run) echo "380 140" ;; map) echo "1000 680" ;; *) echo "900 620" ;; esac; }
 
 command -v ffmpeg >/dev/null || { echo "Needs ffmpeg (brew install ffmpeg)."; exit 1; }
 [[ -d "$APP" ]] || make app
@@ -24,7 +24,8 @@ swift scripts/demo/make-home.swift "$DEMO/home" >/dev/null
 rm -rf "$DEMO/index"
 export TRAIL_HOME="$DEMO/index" TRAIL_USER_HOME="$DEMO/home"
 .build/release/trail scan >/dev/null
-.build/release/trail enrich >/dev/null 2>&1 || echo "  (no Apple Intelligence: recording without file notes)"
+.build/release/trail enrich 80 >/dev/null 2>&1 || echo "  (no Apple Intelligence: recording without file notes)"
+.build/release/trail inbox >/dev/null            # suggestions ready before the sort scene opens
 
 read -r sw sh < <(swift -e 'import AppKit; let f = NSScreen.screens[0].frame; print(Int(f.width), Int(f.height))' 2>/dev/null)
 mkdir -p "$OUT"

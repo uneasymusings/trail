@@ -1,0 +1,14 @@
+{ "steps": [
+  { "wait": 5.5, "sort": "show" },
+  { "wait": 3.0, "sort": "keep" },
+  { "wait": 1.6, "sort": "return" },
+  { "wait": 1.6, "sort": "return" },
+  { "wait": 1.4, "sort": "down" },
+  { "wait": 0.8, "sort": "down" },
+  { "wait": 0.8, "sort": "down" },
+  { "wait": 0.9, "sort": "tab" },
+  { "wait": 1.0, "sort": "tab" },
+  { "wait": 1.0, "sort": "return" },
+  { "wait": 2.2, "sort": "undo" },
+  { "wait": 2.2, "sort": "hide" }
+] }

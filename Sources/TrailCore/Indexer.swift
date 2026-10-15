@@ -243,6 +243,7 @@ public final class Indexer: @unchecked Sendable {
             let keep = newest + Array(repeating: "", count: 3 - newest.count)
             let condition = "\(inside) AND path NOT IN (?, ?, ?)"
             try db.run("DELETE FROM search WHERE rowid IN (SELECT id FROM files WHERE \(condition))", arguments: range + keep)
+            try db.run("DELETE FROM body WHERE rowid IN (SELECT id FROM files WHERE \(condition))", arguments: range + keep)
             try db.run("DELETE FROM files WHERE \(condition)", arguments: range + keep)
 
             var info = stat()
@@ -305,6 +306,7 @@ public final class Indexer: @unchecked Sendable {
             """
         let arguments: [Any?] = [folder + "/", folder + "0", folder.unicodeScalars.count + 2] + padded
         try db.run("DELETE FROM search WHERE rowid IN (SELECT id FROM files WHERE \(children))", arguments: arguments)
+        try db.run("DELETE FROM body WHERE rowid IN (SELECT id FROM files WHERE \(children))", arguments: arguments)
         try db.run("DELETE FROM files WHERE \(children)", arguments: arguments)
         for path in keep {
             if let inspection = FileInspector.inspect(path) { try upsert(inspection, recordEvents: false) }
@@ -353,7 +355,8 @@ public final class Indexer: @unchecked Sendable {
             try db.run("""
                 UPDATE files SET kind = ?, size = ?, inode = ?, modified = ?, project_id = ?, stem = ?,
                     origin = CASE WHEN origin = 'local' THEN ? ELSE origin END,
-                    origin_app = coalesce(origin_app, ?), source_url = coalesce(source_url, ?), deleted_at = NULL
+                    origin_app = coalesce(origin_app, ?), source_url = coalesce(source_url, ?), deleted_at = NULL,
+                    read_at = NULL
                 WHERE id = ?
                 """, file.kind.rawValue, file.size, file.inode, file.modified, projectID, stem?.stem,
                 file.origin.rawValue, file.originApp, file.sourceURL, id)
@@ -363,7 +366,7 @@ public final class Indexer: @unchecked Sendable {
             chainID = moved.chainID
             try db.run("""
                 UPDATE files SET path = ?, name = ?, ext = ?, kind = ?, size = ?, modified = ?, project_id = ?,
-                    stem = ?, deleted_at = NULL
+                    stem = ?, deleted_at = NULL, read_at = NULL
                 WHERE id = ?
                 """, file.path, file.name, file.ext, file.kind.rawValue, file.size, file.modified, projectID, stem?.stem, id)
             event = "moved"
@@ -502,7 +505,6 @@ public final class Indexer: @unchecked Sendable {
 
     // MARK: - Search index
 
-    /// Rewrites the full-text row for a file from what's stored about it.
     /// Refills the full-text index after a migration replaced it. Returns whether it did.
     @discardableResult
     func rebuildSearchIfNeeded() throws -> Bool {
@@ -515,6 +517,8 @@ public final class Indexer: @unchecked Sendable {
         return true
     }
 
+    /// Rewrites the full-text row for a file's name, folders, notes and project from what's
+    /// stored about it. Document text lives in `body`, written by `readPending`.
     func refreshSearch(_ id: Int) throws {
         guard let row = try db.query("SELECT \(fileColumns) FROM files f LEFT JOIN projects p ON p.id = f.project_id WHERE f.id = ?", id).first else { return }
         let file = FileRecord(row: row)
@@ -524,16 +528,54 @@ public final class Indexer: @unchecked Sendable {
                    file.tags.joined(separator: " "), file.projectName.map(Self.splitWords) ?? "")
     }
 
+    /// Reads the text of documents that changed since they were last read, newest first, into
+    /// the `body` index. Returns how many it read; 0 means it's caught up.
+    @discardableResult
+    func readPending(limit: Int) throws -> Int {
+        let kinds = TextExtractor.readableKinds.map { "'\($0.rawValue)'" }.joined(separator: ",")
+        let rows = try db.query("""
+            SELECT id, path, kind FROM files
+            WHERE read_at IS NULL AND deleted_at IS NULL AND kind IN (\(kinds)) AND size < 40000000
+            ORDER BY modified DESC LIMIT ?
+            """, limit)
+        guard !rows.isEmpty else { return 0 }
+        let bodies = rows.map { row in
+            autoreleasepool {
+                (row.int("id")!, TextExtractor.body(path: row.string("path")!, kind: FileKind(rawValue: row.string("kind")!) ?? .other))
+            }
+        }
+        let now = Date()
+        try db.transaction {
+            for (id, body) in bodies {
+                try db.run("UPDATE files SET read_at = ? WHERE id = ?", now, id)
+                try db.run("DELETE FROM body WHERE rowid = ?", id)
+                if let body { try db.run("INSERT INTO body (rowid, text) VALUES (?, ?)", id, body) }
+            }
+        }
+        return rows.count
+    }
+
+    /// The name as written, split into words ("ThermalAIapp_v2" → "Thermal AI app v 2"), plus
+    /// letters and digits that a separator split apart, joined again: "W-2" also indexes as "w2"
+    /// and "1099-INT" as "1099int", the way people type them.
     static func nameTerms(_ name: String) -> String {
         let base = (name as NSString).deletingPathExtension
         let split = splitWords(base)
-        return split == base ? name : "\(name) \(split)"
+        var terms = split == base ? name : "\(name) \(split)"
+        let words = base.lowercased().split { !$0.isLetter && !$0.isNumber }
+        for (left, right) in zip(words, words.dropFirst()) {
+            let leftDigits = left.allSatisfy(\.isNumber), rightDigits = right.allSatisfy(\.isNumber)
+            let leftLetters = left.allSatisfy(\.isLetter), rightLetters = right.allSatisfy(\.isLetter)
+            if (leftLetters && rightDigits) || (leftDigits && rightLetters) { terms += " \(left)\(right)" }
+        }
+        return terms
     }
 
     static func contextTerms(for file: FileRecord) -> String {
         let folders = (file.path as NSString).deletingLastPathComponent
             .split(separator: "/").suffix(3).map { splitWords(String($0)) }
-        var parts = folders + [file.kind.synonyms, (file.name as NSString).pathExtension]
+        let ext = (file.name as NSString).pathExtension
+        var parts = folders + [file.kind.synonyms, ext] + AppNames.forExtension(ext)
         if let host = file.sourceHost { parts.append(host) }
         if let app = file.originApp { parts.append(app) }
         switch file.origin {
@@ -567,6 +609,7 @@ public final class Indexer: @unchecked Sendable {
         let cutoff = Date().addingTimeInterval(-30 * 86_400)
         try db.transaction {
             try db.run("DELETE FROM search WHERE rowid IN (SELECT id FROM files WHERE deleted_at < ?)", cutoff)
+            try db.run("DELETE FROM body WHERE rowid IN (SELECT id FROM files WHERE deleted_at < ?)", cutoff)
             try db.run("DELETE FROM files WHERE deleted_at < ?", cutoff)
             try db.run("DELETE FROM events WHERE at < ?", Date().addingTimeInterval(-400 * 86_400))
             try db.run("DELETE FROM tags WHERE id NOT IN (SELECT tag_id FROM file_tags)")
@@ -575,3 +618,4 @@ public final class Indexer: @unchecked Sendable {
         lock.lock(); projectIDs.removeAll(); lock.unlock()
     }
 }
+

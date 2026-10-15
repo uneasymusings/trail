@@ -4,7 +4,7 @@ import TrailCore
 
 /// A borderless floating panel that takes keyboard focus without activating the app,
 /// like Spotlight. It hides itself when you click elsewhere.
-final class SearchPanel: NSPanel {
+class SearchPanel: NSPanel {
     init(contentRect: NSRect) {
         super.init(contentRect: contentRect, styleMask: [.nonactivatingPanel, .borderless, .fullSizeContentView],
                    backing: .buffered, defer: false)

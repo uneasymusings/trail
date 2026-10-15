@@ -112,6 +112,54 @@ public enum FileKind: String, CaseIterable, Codable, Sendable {
     }
 }
 
+/// The apps people name when they mean their files: "blender" means .blend files, "keynote"
+/// means .key. Indexed with each file and matched like words in its name, so "blender" finds
+/// your Blender scenes rather than every 3D model.
+public enum AppNames {
+    static let byExtension: [String: [String]] = {
+        var map: [String: [String]] = [:]
+        func add(_ names: String, _ exts: String) {
+            for ext in exts.split(separator: " ") { map[String(ext), default: []] += names.split(separator: " ").map(String.init) }
+        }
+        add("blender", "blend blend1")
+        add("keynote", "key")
+        add("powerpoint", "ppt pptx")
+        add("excel", "xls xlsx xlsm")
+        add("word", "doc docx")
+        add("pages", "pages")
+        add("numbers", "numbers")
+        add("photoshop", "psd")
+        add("illustrator", "ai")
+        add("figma", "fig")
+        add("sketch", "sketch")
+        add("indesign", "indd")
+        add("affinity", "afdesign afphoto afpub")
+        add("procreate", "procreate")
+        add("cinema4d c4d", "c4d")
+        add("maya", "ma mb")
+        add("sketchup", "skp")
+        add("autocad", "dwg dxf")
+        add("ableton", "als")
+        add("logic", "logicx")
+        add("garageband", "band")
+        add("premiere", "prproj")
+        add("aftereffects", "aep")
+        add("finalcut", "fcpbundle")
+        add("davinci resolve", "drp")
+        add("jupyter notebook", "ipynb")
+        add("xcode", "xcodeproj xcworkspace")
+        add("unity", "unity")
+        return map
+    }()
+
+    /// Every app name, for the query parser.
+    static let all: Set<String> = Set(byExtension.values.joined())
+
+    public static func forExtension(_ ext: String) -> [String] {
+        byExtension[ext.lowercased()] ?? []
+    }
+}
+
 public enum FileOrigin: String, Codable, Sendable {
     case local, download, ai
 
@@ -170,6 +218,8 @@ public struct SearchHit: Identifiable, Hashable, Sendable {
     public var score: Double
     /// Number of files in this hit's version chain (1 when it has no versions).
     public var versionCount: Int
+    /// Share of the question's keywords this file contains (1 when it has them all).
+    public var coverage: Double = 1
     public var id: Int { file.id }
 }
 
@@ -179,6 +229,10 @@ public struct SearchResponse: Sendable {
     public var projects: [ProjectSummary]
     public var answer: String?
     public var refinedByModel: Bool
+    /// The on-device model read the question and the top results, and chose the first one.
+    public var pickedByModel = false
+    /// The question with typos fixed ("thermla" → "thermal"), when search had to fix any.
+    public var correctedText: String? = nil
 
     public static func empty(_ plan: QueryPlan) -> SearchResponse {
         SearchResponse(plan: plan, hits: [], projects: [], answer: nil, refinedByModel: false)

@@ -35,7 +35,7 @@ struct SearchView: View {
     }
 
     private var hasBody: Bool {
-        !model.query.isEmpty || !app.recentProjects.isEmpty || !app.hasFullDiskAccess || app.phase != .watching
+        !model.query.isEmpty || !app.recentProjects.isEmpty || !app.hasFullDiskAccess || app.phase != .watching || app.inboxCount > 0
     }
 
     // MARK: - Field
@@ -52,7 +52,7 @@ struct SearchView: View {
             .foregroundStyle(.secondary)
             .frame(width: 24)
 
-            TextField("What do you want to find?", text: $model.query)
+            TextField("Search, or ask about your files", text: $model.query)
                 .textFieldStyle(.plain)
                 .font(.system(size: 21, weight: .regular))
                 .focused($fieldFocused)
@@ -114,8 +114,16 @@ struct SearchView: View {
 
     @ViewBuilder
     private var results: some View {
+        if let corrected = model.response?.correctedText {
+            Text("Showing results for \(Text(corrected).foregroundStyle(.primary))")
+                .font(.system(size: 11.5))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 8)
+                .padding(.bottom, 4)
+        }
         if let answer = model.response?.answer {
-            AnswerBubble(text: answer, byModel: model.response?.refinedByModel == true)
+            AnswerBubble(text: answer, byModel: model.response?.pickedByModel == true)
                 .padding(.bottom, 6)
                 .transition(.opacity.combined(with: .move(edge: .top)))
         }
@@ -150,6 +158,26 @@ struct SearchView: View {
             }
             .foregroundStyle(.secondary)
             .padding(12)
+        }
+        if app.inboxCount > 0 {
+            Button { app.showSort?() } label: {
+                HStack(spacing: 10) {
+                    Text("\(app.inboxCount)")
+                        .font(Theme.mono(11, .semibold))
+                        .frame(minWidth: 20, minHeight: 20)
+                        .background(Circle().fill(Color.primary.opacity(0.1)))
+                    Text("new \(app.inboxCount == 1 ? "file" : "files") on your Desktop and in Downloads")
+                        .font(.system(size: 12.5))
+                    Spacer()
+                    Text("Sort →").font(.system(size: 12, weight: .medium)).foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 12))
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .padding(.bottom, 6)
         }
         if !app.recentProjects.isEmpty {
             SectionHeader("Recent")
@@ -306,6 +334,12 @@ struct AnswerBubble: View {
                 .font(Theme.mono(12.5))
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
+            if byModel {
+                Image(systemName: "sparkle")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                    .help("Chosen by the on-device model")
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -378,7 +412,7 @@ struct KeyHint: View {
     var body: some View {
         HStack(spacing: 5) {
             Text(keys).font(Theme.mono(10.5)).foregroundStyle(.secondary)
-            Text(label).font(.system(size: 11)).foregroundStyle(.tertiary)
+            if !label.isEmpty { Text(label).font(.system(size: 11)).foregroundStyle(.tertiary) }
         }
     }
 }

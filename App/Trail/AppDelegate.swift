@@ -5,6 +5,8 @@ import TrailCore
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let model = AppModel()
     private(set) var panel: SearchPanelController?
+    private(set) var sortPanel: SortPanelController?
+    private(set) var mapWindow: MapWindowController?
     private var hotKey: HotKey?
     private let toast = ToastController()
 
@@ -15,9 +17,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.start()
         let panel = SearchPanelController(model: model)
         self.panel = panel
+        let sortPanel = SortPanelController(model: model)
+        self.sortPanel = sortPanel
+        model.showSort = { [weak self] in
+            self?.panel?.hide()
+            self?.sortPanel?.show()
+        }
+        let mapWindow = MapWindowController(app: model)
+        self.mapWindow = mapWindow
+        model.showMap = { [weak self] in
+            self?.panel?.hide()
+            self?.mapWindow?.show()
+        }
 
         if DemoDirector.isActive {
-            demo = DemoDirector(panel: panel, toast: toast, model: model)
+            demo = DemoDirector(panel: panel, sort: sortPanel, map: mapWindow, toast: toast, model: model)
             demo?.run()
             return
         }
@@ -61,7 +75,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// trail://ask?q=…   opens the panel (used by the widget and Shortcuts)
     /// trail://open?path=…   opens an indexed file
-    /// trail://hide   closes the panel
+    /// trail://sort   opens the sort panel
+    /// trail://map   opens the map
+    /// trail://hide   closes the panels
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls where url.scheme == "trail" {
             let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
@@ -73,6 +89,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if let path = value("path") { model.open(path: path, reveal: true) }
             case "hide":
                 panel?.hide()
+                sortPanel?.hide()
+            case "sort":
+                model.showSort?()
+            case "map":
+                model.showMap?()
             default:
                 panel?.show(query: value("q"))
             }

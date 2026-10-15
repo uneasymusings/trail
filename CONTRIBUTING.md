@@ -40,7 +40,8 @@ This writes the gitignored `App/Config/Local.xcconfig`, so your team ID never la
 
 - Match the surrounding code: small types, plain names, and comments that explain *why*.
 - Add a test in `Tests/TrailCoreTests` for engine changes. Each suite builds a throwaway home folder, so tests never see your files.
-- Keep the panel instant. Nothing on the keystroke path may wait on the model or on more than one SQLite query.
+- Keep the panel instant. Nothing on the keystroke path may wait on the model. `TRAIL_PERF=1 swift test --filter SearchSpeed` times searches on a 50,000-entry index; keep them under about 20 ms for ordinary words.
+- Changing how search ranks? Run `swift test --filter SearchQuality` before and after. It prints how 48 everyday questions fare against a messy made-up home folder, and fails if fewer than 90% find the right file first. When you fix a miss, add the question that exposed it.
 - UI is plain system glass. ASCII motion is only for loading states, and it must respect Reduce Motion.
 - If you change the schema, bump `Schema.version` and add a migration step in `Schema.migrate`.
 
@@ -63,7 +64,7 @@ A scene is a list of steps:
 ] }
 ```
 
-Keys are `down`, `up` and `tab`. `toast` can be `first-run` or `map-ready`. Scenes start about 5 s in because ScreenCaptureKit drops frames while it warms up; the script trims that part.
+Keys are `down`, `up` and `tab`. `toast` can be `first-run` or `map-ready`. `sort` drives the sort panel: `show`, `hide`, `down`, `tab`, `return`, `keep`, `undo`. `map` can be `show`, `hide`, `none`, or the name of a node to hover. Scenes start about 5 s in because ScreenCaptureKit drops frames while it warms up; the script trims that part.
 
 ## Releasing
 

@@ -10,12 +10,35 @@ public struct TrailConfig: Codable, Sendable, Equatable {
     public var backfillDays: Int
     /// Summarize new files with the on-device model.
     public var enrichWithModel: Bool
+    /// Suggest where new files on the Desktop and in Downloads belong (never moves them by itself).
+    public var suggestHomes: Bool
+
+    public init(roots: [String], excludedPaths: [String], backfillDays: Int, enrichWithModel: Bool, suggestHomes: Bool = true) {
+        self.roots = roots
+        self.excludedPaths = excludedPaths
+        self.backfillDays = backfillDays
+        self.enrichWithModel = enrichWithModel
+        self.suggestHomes = suggestHomes
+    }
+
+    /// Settings added in later versions fall back to their defaults, so an older config file
+    /// still loads instead of resetting everything.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = Self.default
+        roots = try container.decodeIfPresent([String].self, forKey: .roots) ?? defaults.roots
+        excludedPaths = try container.decodeIfPresent([String].self, forKey: .excludedPaths) ?? defaults.excludedPaths
+        backfillDays = try container.decodeIfPresent(Int.self, forKey: .backfillDays) ?? defaults.backfillDays
+        enrichWithModel = try container.decodeIfPresent(Bool.self, forKey: .enrichWithModel) ?? defaults.enrichWithModel
+        suggestHomes = try container.decodeIfPresent(Bool.self, forKey: .suggestHomes) ?? defaults.suggestHomes
+    }
 
     public static let `default` = TrailConfig(
         roots: ["~"],
         excludedPaths: [],
         backfillDays: 365,
-        enrichWithModel: true
+        enrichWithModel: true,
+        suggestHomes: true
     )
 
     public var expandedRoots: [String] { roots.map(Self.expand) }

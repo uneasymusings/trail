@@ -111,6 +111,21 @@ public final class Database: @unchecked Sendable {
         return rows
     }
 
+    /// The first column of every row as integers, without building rows. For large id lists.
+    public func ids(_ sql: String, arguments: [Any?]) throws -> [Int] {
+        lock.lock(); defer { lock.unlock() }
+        let statement = try prepare(sql, arguments)
+        defer { sqlite3_reset(statement) }
+        var ids: [Int] = []
+        while true {
+            let code = sqlite3_step(statement)
+            if code == SQLITE_DONE { break }
+            guard code == SQLITE_ROW else { throw lastError(sql) }
+            ids.append(Int(sqlite3_column_int64(statement, 0)))
+        }
+        return ids
+    }
+
     public func scalarInt(_ sql: String, _ args: Any?...) throws -> Int? {
         let rows = try query(sql, arguments: args)
         guard let row = rows.first else { return nil }

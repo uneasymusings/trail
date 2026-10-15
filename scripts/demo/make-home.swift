@@ -75,6 +75,28 @@ func png(_ path: String, hue: CGFloat, ago: Double, size: Int = 320) {
     age(path, ago)
 }
 
+/// A screenshot of some text, like a confirmation page, so on-device OCR has something to read.
+func screenshot(_ path: String, _ lines: [String], ago: Double) {
+    let size = NSSize(width: 1200, height: 760)
+    let image = NSImage(size: size, flipped: true) { rect in
+        NSColor(white: 0.97, alpha: 1).setFill(); rect.fill()
+        NSColor.white.setFill()
+        NSBezierPath(roundedRect: rect.insetBy(dx: 120, dy: 110), xRadius: 18, yRadius: 18).fill()
+        var y: CGFloat = 170
+        for (index, line) in lines.enumerated() {
+            let font = index == 0 ? NSFont.boldSystemFont(ofSize: 40) : NSFont.systemFont(ofSize: 28)
+            (line as NSString).draw(at: NSPoint(x: 180, y: y), withAttributes: [.font: font, .foregroundColor: NSColor(white: 0.12, alpha: 1)])
+            y += index == 0 ? 80 : 50
+        }
+        return true
+    }
+    if let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+       let data = rep.representation(using: .png, properties: [:]) {
+        try? data.write(to: url(path))
+    }
+    age(path, ago)
+}
+
 /// Marks a file as downloaded the way browsers do: source URL plus a quarantine tag.
 func downloaded(_ path: String, from source: String, app: String = "Safari") {
     let target = url(path).path
@@ -129,7 +151,7 @@ text("Documents/Lisbon trip/Packing list.md", "# Packing\n\n- Walking shoes\n- R
 // MARK: - Downloads
 
 pdf("Downloads/irs-publication-17.pdf", "Publication 17: your federal income tax",
-    "A guide for individuals on filing a federal income tax return, including deductions and credits.", ago: 8 * day)
+    "A guide for individuals on filing a federal income tax return, including deductions and credits.", ago: 2 * day)
 downloaded("Downloads/irs-publication-17.pdf", from: "https://www.irs.gov/pub/irs-pdf/p17.pdf")
 pdf("Downloads/Q3-bank-statement.pdf", "Harbor Savings Bank: Q3 statement",
     "Statement period July 1 to September 30. Ending balance 12,804.33.", ago: 9 * day)
@@ -140,9 +162,17 @@ pdf("Downloads/thermal-sensor-datasheet.pdf", "TS-200 thermal sensor datasheet",
     "Range -20 to 120 C, accuracy 0.2 C, battery life 3 years, LoRaWAN radio.", ago: 1 * day)
 downloaded("Downloads/thermal-sensor-datasheet.pdf", from: "https://sensors.example.com/ts-200.pdf", app: "Arc")
 
+pdf("Downloads/Acme pilot agreement.pdf", "Pilot agreement: Acme Properties and Thermal",
+    "Acme Properties will install 40 Thermal sensors in two office towers for a 90-day pilot. Pricing per sensor per month.", ago: 3 * hour)
+downloaded("Downloads/Acme pilot agreement.pdf", from: "https://app.docusign.com/documents/acme-pilot.pdf")
+pdf("Downloads/1098-T.pdf", "Form 1098-T: tuition statement",
+    "Filer: Bay Area State University. Payments received for qualified tuition and related expenses: 6,410.00. Tax year 2026.", ago: 26 * hour)
+downloaded("Downloads/1098-T.pdf", from: "https://portal.bayareastate.example.edu/tax/1098t.pdf")
+
 // MARK: - Desktop
 
-png("Desktop/Screenshot 2026-10-14 at 09.41.22.png", hue: 0.58, ago: 5 * hour)
+screenshot("Desktop/Screenshot 2026-10-14 at 09.41.22.png",
+           ["Tickets confirmed", "Pena Palace, Sintra", "Saturday, November 15 · 10:30", "2 adults · Order PN-58213"], ago: 5 * hour)
 text("Desktop/todo.md", "# Today\n\n- [ ] Send Acme the new deck\n- [ ] Book Sintra tickets\n- [x] File the 1099\n", ago: 30 * minute)
 
 // MARK: - A code project (git root)

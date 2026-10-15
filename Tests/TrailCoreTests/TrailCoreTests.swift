@@ -51,6 +51,37 @@ import Testing
         #expect(plan.timeframe == .yesterday)
     }
 
+    @Test func appNamesStayKeywords() {
+        let plan = QueryParser.parse("blender")
+        #expect(plan.keywords == ["blender"])
+        #expect(plan.kinds.isEmpty)
+        #expect(QueryParser.parse("latest keynote").keywords == ["keynote"])
+    }
+
+    @Test func talkingIsNotSearching() {
+        // 2026-10-14 is a Wednesday.
+        let now = ISO8601DateFormatter().date(from: "2026-10-14T15:00:00Z")!
+        let plan = QueryParser.parse("what was that file in our downloads that was important? I think we downloaded it like two days ago. it was big", now: now)
+        #expect(plan.keywords.isEmpty)
+        #expect(plan.origin == .download)
+        #expect(plan.days == 1...3)
+        #expect(plan.size == 1)
+    }
+
+    @Test(arguments: [
+        ("a couple of days ago", 1...3), ("3 days ago", 2...4), ("two weeks ago", 11...17),
+        ("the other day", 1...6), ("past few days", 0...4), ("on monday", 2...2), ("last wednesday", 7...7),
+    ])
+    func days(phrase: String, days: ClosedRange<Int>) {
+        let now = ISO8601DateFormatter().date(from: "2026-10-14T15:00:00Z")!
+        #expect(QueryParser.parse("invoice \(phrase)", now: now).days == days)
+        #expect(QueryParser.parse("invoice \(phrase)", now: now).keywords == ["invoice"])
+    }
+
+    @Test func hyphenatedWordsStayTogether() {
+        #expect(QueryParser.parse("my w-2 from last year").keywords == ["w-2"])
+    }
+
     @Test func screenshotIsKindAndKeyword() {
         let plan = QueryParser.parse("screenshot of the invoice")
         #expect(plan.kinds == [.image])
@@ -122,28 +153,57 @@ import Testing
         Indexer(db: sandbox.engine.db, rules: ScopeRules(config: sandbox.engine.config, home: sandbox.home), home: sandbox.home)
     }
 
-    @Test func migrationAddsStemmingToAnOldIndex() throws {
+    @Test func migrationAddsDocumentTextToAnOldIndex() throws {
         let box = try Sandbox()
-        try box.write("Documents/Money/tax-summary.md", "totals")
+        try box.write("Documents/Money/tax-summary.md", "Rent paid to the landlord: 2,400 a month")
         let indexer = makeIndexer(box)
         try indexer.backfill(days: 30)
+        try indexer.readPending(limit: 10)
         let search = box.engine.search
-        #expect(try search.search(QueryParser.parse("taxes")).hits.first?.file.name == "tax-summary.md")
+        #expect(try search.search(QueryParser.parse("landlord")).hits.first?.file.name == "tax-summary.md")
 
-        // Recreate a v1 index, which had no stemming.
+        // Recreate a v2 index: names and folders only, and no columns for reading or opens.
         let db = box.engine.db
         try db.exec("""
-            DROP TABLE search;
-            CREATE VIRTUAL TABLE search USING fts5(name, terms, summary, tags, project, tokenize = "unicode61 remove_diacritics 2");
-            PRAGMA user_version = 1;
+            DROP TABLE search_terms; DROP TABLE body_terms; DROP TABLE search; DROP TABLE body; DROP INDEX files_unread;
+            ALTER TABLE files DROP COLUMN read_at; ALTER TABLE files DROP COLUMN opens; ALTER TABLE files DROP COLUMN opened_at;
+            CREATE VIRTUAL TABLE search USING fts5(name, terms, summary, tags, project, tokenize = "porter unicode61 remove_diacritics 2");
+            INSERT INTO search (rowid, name, terms, summary, tags, project) SELECT id, name, '', '', '', '' FROM files;
+            PRAGMA user_version = 2;
             """)
-        for row in try db.query("SELECT id FROM files") { try indexer.refreshSearch(row.int("id")!) }
-        #expect(try search.search(QueryParser.parse("taxes")).hits.isEmpty)
 
         try Schema.migrate(db)
         try indexer.rebuildSearchIfNeeded()
         #expect(try db.scalarInt("PRAGMA user_version") == Schema.version)
         #expect(try search.search(QueryParser.parse("taxes")).hits.first?.file.name == "tax-summary.md")
+        // Document text comes back once the background reader catches up.
+        #expect(try search.search(QueryParser.parse("landlord")).hits.isEmpty)
+        try indexer.readPending(limit: 10)
+        #expect(try search.search(QueryParser.parse("landlord")).hits.first?.file.name == "tax-summary.md")
+        // A later rebuild of the name index leaves document text alone.
+        db.setMeta("search_rebuild", "1")
+        try indexer.rebuildSearchIfNeeded()
+        #expect(try search.search(QueryParser.parse("landlord")).hits.first?.file.name == "tax-summary.md")
+    }
+
+    @Test func editingAFileRereadsItsText() throws {
+        let box = try Sandbox()
+        let path = try box.write("Documents/Plans/plan.md", "Ship the beta in March")
+        let indexer = makeIndexer(box)
+        try indexer.apply(paths: [path])
+        try indexer.readPending(limit: 10)
+        #expect(try box.engine.search.search(QueryParser.parse("beta")).hits.count == 1)
+
+        try box.write("Documents/Plans/plan.md", "Ship the launch in April", modified: Date().addingTimeInterval(60))
+        try indexer.apply(paths: [path])
+        try indexer.readPending(limit: 10)
+        #expect(try box.engine.search.search(QueryParser.parse("beta")).hits.isEmpty)
+        #expect(try box.engine.search.search(QueryParser.parse("april launch")).hits.count == 1)
+
+        // A note from the model rewrites the row; the text it already read stays searchable.
+        let id = try #require(try box.engine.search.file(path: path)?.id)
+        try indexer.setEnrichment(id: id, summary: "A product plan", tags: ["roadmap"])
+        #expect(try box.engine.search.search(QueryParser.parse("april roadmap")).hits.count == 1)
     }
 
     @Test func scanLinksVersionsAndProjects() throws {

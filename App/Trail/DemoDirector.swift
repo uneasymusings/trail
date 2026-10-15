@@ -18,6 +18,10 @@ final class DemoDirector {
         var clear: Bool?
         var key: String?
         var toast: String?
+        /// Show or hide the sort panel, or press a key in it: "down", "tab", "return", "keep", "undo".
+        var sort: String?
+        /// "show" or "hide" the map, or the name of a node to hover.
+        var map: String?
     }
 
     static var sceneURL: URL? {
@@ -39,12 +43,17 @@ final class DemoDirector {
     }
 
     private let panel: SearchPanelController
+    private let sort: SortPanelController
+    private let map: MapWindowController
     private let toast: ToastController
     private let model: AppModel
     private var stage: NSWindow?
+    private var stageRect = NSRect.zero
 
-    init(panel: SearchPanelController, toast: ToastController, model: AppModel) {
+    init(panel: SearchPanelController, sort: SortPanelController, map: MapWindowController, toast: ToastController, model: AppModel) {
         self.panel = panel
+        self.sort = sort
+        self.map = map
         self.toast = toast
         self.model = model
     }
@@ -57,8 +66,10 @@ final class DemoDirector {
             return
         }
         let rect = Self.stageRect
+        stageRect = rect
         showStage(rect)
         panel.anchor = rect
+        sort.anchor = rect
         toast.anchor = rect
 
         Task {
@@ -82,6 +93,25 @@ final class DemoDirector {
         case "down": panel.search.moveSelection(1)
         case "up": panel.search.moveSelection(-1)
         case "tab": panel.search.toggleDetail()
+        default: break
+        }
+        switch step.map {
+        case nil: break
+        case "show":
+            map.show(in: stageRect.insetBy(dx: 30, dy: 30), activate: false)
+            map.float()
+        case "hide": map.hide()
+        case "none": map.model.hover(named: nil)
+        case let name?: map.model.hover(named: name)
+        }
+        switch step.sort {
+        case "show": sort.show(takeFocus: false)
+        case "hide": sort.hide()
+        case "down": sort.sort.moveSelection(1)
+        case "tab": sort.sort.cycleChoice()
+        case "return": sort.sort.move()
+        case "keep": sort.sort.keep()
+        case "undo": sort.sort.undo()
         default: break
         }
         switch step.toast {

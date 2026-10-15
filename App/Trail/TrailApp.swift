@@ -9,7 +9,13 @@ struct TrailApp: App {
         MenuBarExtra {
             MenuBarContent(model: appDelegate.model, showPanel: { appDelegate.panel?.show() })
         } label: {
-            Image(nsImage: TrailApp.menuBarMark)
+            // A quiet count of new files to sort, instead of notifications.
+            if appDelegate.model.inboxCount > 0 {
+                Label { Text("\(appDelegate.model.inboxCount)") } icon: { Image(nsImage: TrailApp.menuBarMark) }
+                    .labelStyle(.titleAndIcon)
+            } else {
+                Image(nsImage: TrailApp.menuBarMark)
+            }
         }
         .menuBarExtraStyle(.menu)
 
@@ -38,8 +44,13 @@ struct MenuBarContent: View {
     let showPanel: () -> Void
 
     var body: some View {
+        if model.inboxCount > 0 {
+            Button("Sort \(model.inboxCount) New \(model.inboxCount == 1 ? "File" : "Files")…") { model.showSort?() }
+            Divider()
+        }
         Button("Find…", action: showPanel)
             .keyboardShortcut(model.hotKey.menuKey, modifiers: model.hotKey.menuModifiers)
+        Button("Map") { model.showMap?() }
         Divider()
         Text(model.statusLine)
         if !model.hasFullDiskAccess {
