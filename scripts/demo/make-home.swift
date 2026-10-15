@@ -49,7 +49,8 @@ func docx(_ path: String, _ title: String, _ body: String, ago: Double) {
     age(path, ago)
 }
 
-func pdf(_ path: String, _ title: String, _ body: String, ago: Double) {
+/// `figures` adds pages of scanned-looking figures, for a download that's genuinely big (about 0.7 MB each).
+func pdf(_ path: String, _ title: String, _ body: String, ago: Double, figures: Int = 0) {
     var box = CGRect(x: 0, y: 0, width: 612, height: 792)
     guard let context = CGContext(url(path) as CFURL, mediaBox: &box, nil) else { return }
     context.beginPDFPage(nil)
@@ -58,6 +59,18 @@ func pdf(_ path: String, _ title: String, _ body: String, ago: Double) {
     styled(title, body).draw(in: CGRect(x: 60, y: 60, width: 492, height: 672))
     NSGraphicsContext.restoreGraphicsState()
     context.endPDFPage()
+    var generator = SystemRandomNumberGenerator()
+    for _ in 0..<figures {
+        let (width, height) = (600, 400)
+        let pixels = (0..<width * height * 4).map { _ in UInt8.random(in: 150...255, using: &generator) }
+        guard let provider = CGDataProvider(data: Data(pixels) as CFData),
+              let image = CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: width * 4,
+                                  space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue),
+                                  provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent) else { continue }
+        context.beginPDFPage(nil)
+        context.draw(image, in: CGRect(x: 6, y: 196, width: 600, height: 400))
+        context.endPDFPage()
+    }
     context.closePDF()
     age(path, ago)
 }
@@ -151,7 +164,7 @@ text("Documents/Lisbon trip/Packing list.md", "# Packing\n\n- Walking shoes\n- R
 // MARK: - Downloads
 
 pdf("Downloads/irs-publication-17.pdf", "Publication 17: your federal income tax",
-    "A guide for individuals on filing a federal income tax return, including deductions and credits.", ago: 2 * day)
+    "A guide for individuals on filing a federal income tax return, including deductions and credits.", ago: 2 * day, figures: 6)
 downloaded("Downloads/irs-publication-17.pdf", from: "https://www.irs.gov/pub/irs-pdf/p17.pdf")
 pdf("Downloads/Q3-bank-statement.pdf", "Harbor Savings Bank: Q3 statement",
     "Statement period July 1 to September 30. Ending balance 12,804.33.", ago: 9 * day)

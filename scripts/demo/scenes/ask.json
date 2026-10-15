@@ -5,5 +5,5 @@
   { "wait": 0.4, "type": "the deck we're sending to investors" },
   { "wait": 4.6, "key": "down" },
   { "wait": 0.6, "key": "up" },
-  { "wait": 1.2, "hide": true }
+  { "wait": 1.2 }
 ] }

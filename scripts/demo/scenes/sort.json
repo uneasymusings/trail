@@ -10,5 +10,5 @@
   { "wait": 1.0, "sort": "tab" },
   { "wait": 1.0, "sort": "return" },
   { "wait": 2.2, "sort": "undo" },
-  { "wait": 2.2, "sort": "hide" }
+  { "wait": 2.2 }
 ] }

@@ -11,7 +11,7 @@ APP="build/Build/Products/Release/Trail.app"
 DEMO="$PWD/.demo"
 OUT="docs/media"
 if [[ $# -gt 0 ]]; then scenes=("$@"); else scenes=(search ask sort map first-run); fi
-length() { case "$1" in search) echo 20 ;; ask) echo 25 ;; sort) echo 24 ;; map) echo 19 ;; *) echo 13 ;; esac; }
+length() { case "$1" in search) echo 18 ;; ask) echo 22 ;; sort) echo 21 ;; map) echo 19 ;; *) echo 13 ;; esac; }
 stage() { case "$1" in first-run) echo "380 140" ;; map) echo "1000 680" ;; *) echo "900 620" ;; esac; }
 
 command -v ffmpeg >/dev/null || { echo "Needs ffmpeg (brew install ffmpeg)."; exit 1; }

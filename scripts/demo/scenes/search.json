@@ -7,5 +7,5 @@
   { "wait": 0.5, "key": "up" },
   { "wait": 0.7, "key": "tab" },
   { "wait": 2.8, "key": "tab" },
-  { "wait": 0.8, "hide": true }
+  { "wait": 0.8 }
 ] }
