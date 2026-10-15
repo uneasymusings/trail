@@ -12,6 +12,10 @@ final class SearchModel {
     private(set) var response: SearchResponse?
     private(set) var isThinking = false
     var selection = 0
+    /// Only keyboard moves scroll the list; hovering never does.
+    private(set) var selectionFromKeyboard = false
+    /// The panel can open under a resting pointer. Hover selects only after the mouse really moves.
+    var pointerMoved = false
     /// When set, the panel shows this file's neighbourhood in the graph instead of results.
     private(set) var detail: (file: FileRecord, related: Related)?
     var focusToken = 0
@@ -32,9 +36,14 @@ final class SearchModel {
             return detail.related.versions + detail.related.sameSession + detail.related.sameTopics + detail.related.sameProject
         }
         if query.trimmingCharacters(in: .whitespaces).isEmpty {
-            return app.recentProjects.flatMap(\.latest)
+            return homeFiles
         }
         return hits.map(\.file)
+    }
+
+    /// The newest file from each recently active project, shown before you type.
+    var homeFiles: [FileRecord] {
+        Array(app.recentProjects.compactMap(\.latest.first).prefix(6))
     }
 
     var selectedFile: FileRecord? {
@@ -49,6 +58,7 @@ final class SearchModel {
     }
 
     func didHide() {
+        pointerMoved = false
         detail = nil
         query = ""
         selection = 0
@@ -94,7 +104,14 @@ final class SearchModel {
     func moveSelection(_ delta: Int) {
         let count = visibleFiles.count
         guard count > 0 else { return }
+        selectionFromKeyboard = true
         selection = (selection + delta + count) % count
+    }
+
+    func hover(_ index: Int) {
+        guard pointerMoved else { return }
+        selectionFromKeyboard = false
+        selection = index
     }
 
     func openSelection(reveal: Bool) -> Bool {

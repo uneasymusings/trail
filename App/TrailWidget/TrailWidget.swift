@@ -67,10 +67,9 @@ struct TrailWidgetView: View {
 
     private var header: some View {
         HStack(spacing: 6) {
-            Image(systemName: "point.bottomleft.forward.to.point.topright.scurvepath.fill")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(.tint)
-            Text("Pick up where you left off")
+            TrailMark(size: 11)
+                .foregroundStyle(.secondary)
+            Text("Recent")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -83,7 +82,7 @@ struct TrailWidgetView: View {
                 .font(.system(size: 11, weight: .semibold))
                 .padding(.horizontal, 9)
                 .padding(.vertical, 4)
-                .background(.tint.opacity(0.2), in: .capsule)
+                .background(.quaternary, in: .capsule)
             }
         }
     }
@@ -91,8 +90,8 @@ struct TrailWidgetView: View {
     private var small: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Image(systemName: "point.bottomleft.forward.to.point.topright.scurvepath.fill")
-                    .foregroundStyle(.tint)
+                TrailMark(size: 13)
+                    .foregroundStyle(.secondary)
                 Spacer()
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
             }
@@ -140,9 +139,9 @@ struct TrailWidgetView: View {
         let content = HStack(spacing: 10) {
             Image(systemName: project.latest?.symbol ?? "folder")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.tint)
+                .foregroundStyle(.secondary)
                 .frame(width: 26, height: 26)
-                .background(.tint.opacity(0.14), in: .rect(cornerRadius: 7))
+                .background(.quaternary.opacity(0.6), in: .rect(cornerRadius: 7))
             VStack(alignment: .leading, spacing: 1) {
                 Text(project.latest?.name ?? project.name)
                     .font(.system(size: 12.5, weight: .semibold))
@@ -153,11 +152,9 @@ struct TrailWidgetView: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 4)
-            Text(project.lastActive, style: .relative)
-                .font(.system(size: 10.5))
+            Text(Theme.age(project.lastActive))
+                .font(Theme.mono(10.5))
                 .foregroundStyle(.tertiary)
-                .lineLimit(1)
-                .frame(maxWidth: 70, alignment: .trailing)
         }
         if let latest = project.latest, var components = URLComponents(string: "trail://open") {
             let _ = components.queryItems = [URLQueryItem(name: "path", value: latest.path)]

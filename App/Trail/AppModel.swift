@@ -17,6 +17,8 @@ final class AppModel {
     private(set) var config: TrailConfig = .default
 
     var onHotKeyChange: (() -> Void)?
+    /// Called once the first full scan has finished and fresh stats are in.
+    var onScanFinished: (() -> Void)?
     var hotKey: HotKeyChoice = HotKeyChoice(rawValue: UserDefaults.standard.string(forKey: "hotKey") ?? "") ?? .optionSpace {
         didSet {
             UserDefaults.standard.set(hotKey.rawValue, forKey: "hotKey")
@@ -53,17 +55,20 @@ final class AppModel {
     /// Re-reads counts and recent projects. Throttled because indexing can fire often.
     func refresh(force: Bool = false) {
         guard let engine else { return }
+        var finishedScan = false
+        if case .scanning = phase, engine.phase == .watching { finishedScan = true }
         phase = engine.phase
         hasFullDiskAccess = Self.checkFullDiskAccess()
         modelStatus = engine.intelligence.status
-        guard force || Date().timeIntervalSince(lastStatsRefresh) > 3 else { return }
+        guard force || finishedScan || Date().timeIntervalSince(lastStatsRefresh) > 3 else { return }
         lastStatsRefresh = Date()
         Task.detached(priority: .utility) {
             let stats = engine.stats()
-            let projects = (try? engine.search.recentProjects(limit: 6, filesEach: 2)) ?? []
+            let projects = (try? engine.search.recentProjects(limit: 6, filesEach: 1)) ?? []
             await MainActor.run {
                 self.stats = stats
                 self.recentProjects = projects
+                if finishedScan { self.onScanFinished?() }
             }
         }
     }
