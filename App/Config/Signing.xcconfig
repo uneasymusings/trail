@@ -1,0 +1,12 @@
+// Signing defaults: ad-hoc, so anyone can build without an Apple Developer account.
+// The desktop widget needs a real team (it reads data through a shared app-group folder).
+// `make app TEAM=<your team id>` writes Local.xcconfig, which turns that on.
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = -
+DEVELOPMENT_TEAM =
+PROVISIONING_PROFILE_SPECIFIER =
+TRAIL_APP_GROUP =
+TRAIL_APP_ENTITLEMENTS =
+TRAIL_WIDGET_ENTITLEMENTS = TrailWidget/TrailWidget-AdHoc.entitlements
+
+#include? "Local.xcconfig"
