@@ -45,7 +45,9 @@ brew install --cask uneasymusings/trail/trail
 curl -fsSL https://raw.githubusercontent.com/uneasymusings/trail/main/scripts/install.sh | bash
 ```
 
-On first launch Trail sits in the menu bar and starts mapping your files, which takes a minute or two. Grant **Full Disk Access** when asked. Without it, macOS asks separately for Desktop, Documents and Downloads.
+On first launch Trail puts a small mark in the menu bar, shows a short note in the corner, and starts mapping your files at low priority. It never opens a window on its own. Grant **Full Disk Access** in System Settings → Privacy & Security; without it, macOS asks separately for Desktop, Documents and Downloads.
+
+Releases are not notarized yet, so Homebrew's copy shows macOS's "unidentified developer" warning the first time: open it from System Settings → Privacy & Security → **Open Anyway**. The install script and building from source don't hit this.
 
 ### Build from source
 
@@ -70,7 +72,7 @@ The widget reads its data from a shared app-group folder, and macOS only allows 
 | <kbd>⇥</kbd> | Related: versions, files edited in the same session, shared topics |
 | <kbd>⇧</kbd><kbd>⌘</kbd><kbd>C</kbd> | Copy the path |
 
-**Widget:** right-click the desktop → Edit Widgets → Trail. It shows "Pick up where you left off" by project, with an **Ask** button.
+**Widget:** right-click the desktop → Edit Widgets → Trail. It shows the latest file in each recent project, with an **Ask** button.
 
 **Shortcuts and links:** `trail://ask?q=invoice` opens the panel with a query.
 

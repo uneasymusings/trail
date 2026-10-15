@@ -27,8 +27,9 @@ final class SearchPanel: NSPanel {
 final class SearchPanelController: NSObject, NSWindowDelegate {
     private let panel: SearchPanel
     private let search: SearchModel
+    private var mouseMonitor: Any?
 
-    static let size = NSSize(width: 720, height: 600)
+    static let size = NSSize(width: 660, height: 560)
 
     init(model: AppModel) {
         search = SearchModel(app: model)
@@ -38,6 +39,11 @@ final class SearchPanelController: NSObject, NSWindowDelegate {
         host.sizingOptions = []
         panel.contentView = host
         panel.delegate = self
+        panel.acceptsMouseMovedEvents = true
+        mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
+            if let self, event.window === self.panel, !self.search.pointerMoved { self.search.pointerMoved = true }
+            return event
+        }
     }
 
     var isVisible: Bool { panel.isVisible }

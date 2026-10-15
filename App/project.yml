@@ -28,6 +28,7 @@ targets:
     platform: macOS
     sources:
       - path: Trail
+      - path: Shared
     dependencies:
       - package: TrailCore
       - target: TrailWidget
@@ -58,6 +59,7 @@ targets:
     platform: macOS
     sources:
       - path: TrailWidget
+      - path: Shared
       - path: ../Sources/TrailCore/WidgetSnapshot.swift
     info:
       path: TrailWidget/Info.plist

@@ -9,7 +9,7 @@ struct TrailApp: App {
         MenuBarExtra {
             MenuBarContent(model: appDelegate.model, showPanel: { appDelegate.panel?.show() })
         } label: {
-            Image(systemName: "point.bottomleft.forward.to.point.topright.scurvepath.fill")
+            Image(nsImage: TrailApp.menuBarMark)
         }
         .menuBarExtraStyle(.menu)
 
@@ -17,6 +17,20 @@ struct TrailApp: App {
             SettingsView(model: appDelegate.model)
         }
     }
+
+    /// The trail of dots as a template image, so the menu bar tints it.
+    static let menuBarMark: NSImage = {
+        let size = NSSize(width: 16, height: 16)
+        let image = NSImage(size: size, flipped: true) { rect in
+            for (point, radius, alpha) in TrailMark.dots(in: rect.size) {
+                NSColor.black.withAlphaComponent(alpha).setFill()
+                NSBezierPath(ovalIn: NSRect(x: point.x - radius, y: point.y - radius, width: radius * 2, height: radius * 2)).fill()
+            }
+            return true
+        }
+        image.isTemplate = true
+        return image
+    }()
 }
 
 struct MenuBarContent: View {

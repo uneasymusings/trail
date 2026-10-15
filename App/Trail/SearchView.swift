@@ -22,16 +22,16 @@ struct SearchView: View {
             if hasBody {
                 Divider().opacity(0.4)
                 content
-                    .frame(maxHeight: 440)
+                    .frame(maxHeight: 380)
                 Divider().opacity(0.4)
                 footer
             }
         }
-        .frame(width: 680)
-        .glassEffect(.regular, in: .rect(cornerRadius: 26))
-        .shadow(color: .black.opacity(0.18), radius: 24, y: 12)
-        .animation(.smooth(duration: 0.22), value: model.hits.map(\.id))
-        .animation(.smooth(duration: 0.22), value: model.response?.answer)
+        .frame(width: 620)
+        .glassEffect(.regular, in: .rect(cornerRadius: 24))
+        .shadow(color: .black.opacity(0.14), radius: 20, y: 10)
+        .animation(Theme.ease, value: model.hits.map(\.id))
+        .animation(Theme.ease, value: model.response?.answer)
     }
 
     private var hasBody: Bool {
@@ -42,16 +42,19 @@ struct SearchView: View {
 
     private var searchField: some View {
         HStack(spacing: 14) {
-            Image(systemName: model.isThinking ? "sparkle" : "magnifyingglass")
-                .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(model.isThinking ? AnyShapeStyle(Self.sparkleGradient) : AnyShapeStyle(.secondary))
-                .symbolEffect(.pulse, isActive: model.isThinking)
-                .contentTransition(.symbolEffect(.replace))
-                .frame(width: 24)
+            Group {
+                if model.isThinking {
+                    BrailleSpinner().font(Theme.mono(18, .medium))
+                } else {
+                    Image(systemName: "magnifyingglass").font(.system(size: 19, weight: .medium))
+                }
+            }
+            .foregroundStyle(.secondary)
+            .frame(width: 24)
 
             TextField("What do you want to find?", text: $model.query)
                 .textFieldStyle(.plain)
-                .font(.system(size: 22, weight: .regular))
+                .font(.system(size: 21, weight: .regular))
                 .focused($fieldFocused)
                 .onKeyPress(.downArrow) { model.moveSelection(1); return .handled }
                 .onKeyPress(.upArrow) { model.moveSelection(-1); return .handled }
@@ -84,8 +87,6 @@ struct SearchView: View {
         .onChange(of: model.focusToken) { fieldFocused = true }
     }
 
-    static let sparkleGradient = LinearGradient(colors: [.purple, .blue, .cyan], startPoint: .topLeading, endPoint: .bottomTrailing)
-
     // MARK: - Content
 
     @ViewBuilder
@@ -105,7 +106,8 @@ struct SearchView: View {
             }
             .scrollIndicators(.never)
             .onChange(of: model.selection) {
-                withAnimation(.snappy(duration: 0.15)) { proxy.scrollTo(model.selectedFile?.id) }
+                guard model.selectionFromKeyboard else { return }
+                withAnimation(Theme.quick) { proxy.scrollTo(model.selectedFile?.id) }
             }
         }
     }
@@ -142,17 +144,16 @@ struct SearchView: View {
         }
         if case .scanning(let count) = app.phase {
             HStack(spacing: 10) {
-                ProgressView().controlSize(.small)
-                Text("Building your map… \(count.formatted()) files so far")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
+                ShadeBar().font(Theme.mono(11))
+                Text("Mapping your files · \(count.formatted())")
+                    .font(.system(size: 12))
             }
+            .foregroundStyle(.secondary)
             .padding(12)
         }
         if !app.recentProjects.isEmpty {
-            SectionHeader("Pick up where you left off")
-            let files = app.recentProjects.flatMap(\.latest)
-            ForEach(Array(files.enumerated()), id: \.element.id) { index, file in
+            SectionHeader("Recent")
+            ForEach(Array(model.homeFiles.enumerated()), id: \.element.id) { index, file in
                 row(file, versions: 1, index: index)
             }
         }
@@ -194,7 +195,7 @@ struct SearchView: View {
         FileRow(file: file, versions: versions, isSelected: index == model.selection)
             .id(file.id)
             .contentShape(.rect)
-            .onHover { if $0 { model.selection = index } }
+            .onHover { if $0 { model.hover(index) } }
             .onTapGesture {
                 model.selection = index
                 model.open(file)
@@ -215,18 +216,12 @@ struct SearchView: View {
     private var footer: some View {
         HStack(spacing: 14) {
             KeyHint(keys: "↩", label: "Open")
-            KeyHint(keys: "⌘↩", label: "Show in Finder")
+            KeyHint(keys: "⌘↩", label: "Reveal")
             KeyHint(keys: "⇥", label: model.detail == nil ? "Related" : "Back")
-            KeyHint(keys: "⇧⌘C", label: "Copy path")
             Spacer()
-            if case .ready = app.modelStatus {
-                Label("On-device", systemImage: "lock.fill")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
-            }
         }
         .padding(.horizontal, 18)
-        .frame(height: 34)
+        .frame(height: 30)
     }
 }
 
@@ -239,7 +234,7 @@ struct FileRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            FileIcon(path: file.path, size: 32)
+            FileIcon(path: file.path, size: 28)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(file.name)
@@ -247,12 +242,7 @@ struct FileRow: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
                     if versions > 1 {
-                        TagPill(text: "\(versions) versions", systemImage: "square.stack")
-                    }
-                    if file.origin == .ai {
-                        Image(systemName: "sparkles").font(.system(size: 10)).foregroundStyle(SearchView.sparkleGradient)
-                    } else if file.origin == .download {
-                        Image(systemName: "arrow.down.circle").font(.system(size: 10)).foregroundStyle(.secondary)
+                        Text("×\(versions)").font(Theme.mono(10.5)).foregroundStyle(.tertiary)
                     }
                 }
                 Text(file.summary ?? file.displayPath)
@@ -263,8 +253,8 @@ struct FileRow: View {
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {
-                Text(file.modified, format: .relative(presentation: .named, unitsStyle: .abbreviated))
-                    .font(.system(size: 12))
+                Text(Theme.age(file.modified))
+                    .font(Theme.mono(11))
                     .foregroundStyle(.secondary)
                 if let project = file.projectName {
                     Text(project)
@@ -278,7 +268,7 @@ struct FileRow: View {
         .padding(.vertical, 8)
         .background {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(isSelected ? Color.accentColor.opacity(0.18) : .clear)
+                .fill(isSelected ? Color.primary.opacity(0.08) : .clear)
         }
     }
 }
@@ -309,17 +299,17 @@ struct AnswerBubble: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Image(systemName: byModel ? "sparkles" : "arrow.turn.down.right")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(byModel ? AnyShapeStyle(SearchView.sparkleGradient) : AnyShapeStyle(.secondary))
-            Text(text)
-                .font(.system(size: 13.5, weight: .medium))
+            Text("↳")
+                .font(Theme.mono(13, .medium))
+                .foregroundStyle(.secondary)
+            DecodeText(text: text)
+                .font(Theme.mono(12.5))
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 11)
-        .glassEffect(.regular.tint(.accentColor.opacity(0.12)), in: .rect(cornerRadius: 16))
+        .padding(.vertical, 10)
+        .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 12))
     }
 }
 
@@ -332,7 +322,7 @@ struct ProjectChip: View {
             HStack(spacing: 8) {
                 Image(systemName: project.kind == "code" ? "chevron.left.forwardslash.chevron.right" : "folder.fill")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.tint)
+                    .foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(project.name).font(.system(size: 12.5, weight: .semibold)).lineLimit(1)
                     Text("\(project.fileCount) files · \(RelativeTime.describe(project.lastActive))")
@@ -345,7 +335,7 @@ struct ProjectChip: View {
             .padding(.vertical, 7)
         }
         .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: .capsule)
+        .background(.quaternary.opacity(0.5), in: .capsule)
     }
 }
 
@@ -387,14 +377,9 @@ struct KeyHint: View {
 
     var body: some View {
         HStack(spacing: 5) {
-            Text(keys)
-                .font(.system(size: 10.5, weight: .semibold, design: .rounded))
-                .padding(.horizontal, 5)
-                .padding(.vertical, 1.5)
-                .background(.quaternary.opacity(0.7), in: .rect(cornerRadius: 5))
-            Text(label).font(.system(size: 11))
+            Text(keys).font(Theme.mono(10.5)).foregroundStyle(.secondary)
+            Text(label).font(.system(size: 11)).foregroundStyle(.tertiary)
         }
-        .foregroundStyle(.secondary)
     }
 }
 
@@ -402,14 +387,16 @@ struct EmptyResults: View {
     let isThinking: Bool
 
     var body: some View {
-        VStack(spacing: 6) {
-            Image(systemName: isThinking ? "sparkle" : "questionmark.folder")
-                .font(.system(size: 22))
-                .foregroundStyle(.tertiary)
-            Text(isThinking ? "Thinking…" : "Nothing matches yet")
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
+        HStack(spacing: 0) {
+            if isThinking {
+                Text("Thinking")
+                LoadingDots().font(Theme.mono(13))
+            } else {
+                Text("Nothing matches. Try fewer words.")
+            }
         }
+        .font(.system(size: 13))
+        .foregroundStyle(.secondary)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 28)
     }
@@ -419,23 +406,17 @@ struct AccessBanner: View {
     let action: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "lock.open.display")
-                .font(.system(size: 20))
-                .foregroundStyle(.tint)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Let Trail see your whole Mac").font(.system(size: 13, weight: .semibold))
-                Text("Full Disk Access lets it map Desktop, Documents, Downloads and iCloud without asking folder by folder. Nothing leaves this Mac.")
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+        HStack(spacing: 10) {
+            Image(systemName: "lock")
+                .foregroundStyle(.secondary)
+            Text("Full Disk Access lets Trail see your whole Mac.")
+                .foregroundStyle(.secondary)
             Spacer(minLength: 8)
-            Button("Open Settings", action: action)
-                .buttonStyle(.glassProminent)
+            Button("Grant…", action: action)
                 .controlSize(.small)
         }
-        .padding(14)
-        .glassEffect(.regular.tint(.accentColor.opacity(0.1)), in: .rect(cornerRadius: 16))
+        .font(.system(size: 12))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 }
