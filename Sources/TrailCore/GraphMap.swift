@@ -109,12 +109,13 @@ extension SearchEngine {
             WHERE f.deleted_at IS NULL AND f.project_id IN (SELECT value FROM json_each(?))
             GROUP BY f.project_id, t.name
             """, list)
+        let projectNames = Set(nodes.map { $0.name.lowercased() })
         let byTag = Dictionary(grouping: tagRows, by: { $0.string("name")!.lowercased() })
         struct Topic { let tag: String; let rows: [Row]; let files: Int }
         let topics = byTag.map { tag, rows -> Topic in
             Topic(tag: tag, rows: rows, files: rows.reduce(0) { $0 + ($1.int("files") ?? 0) })
         }
-        .filter { $0.files >= 2 }
+        .filter { $0.files >= 2 && !projectNames.contains($0.tag) }   // "thermal" next to Thermal says nothing
         .sorted { (a: Topic, b: Topic) -> Bool in a.rows.count != b.rows.count ? a.rows.count > b.rows.count : a.files > b.files }
         .prefix(18)
         for topic in topics {
@@ -162,7 +163,7 @@ public enum MapLayout {
         let links = map.edges.compactMap { edge -> (Int, Int, Double)? in
             guard let a = index[edge.from], let b = index[edge.to] else { return nil }
             // Files sit close to their project; other links are looser.
-            let spring = switch edge.kind { case .contains: 4.0; case .source: 1.5; case .together, .topic: 1.0 }
+            let spring = switch edge.kind { case .contains: 1.6; case .source: 1.2; case .together, .topic: 1.0 }
             return (a, b, spring * min(3, 1 + log(Double(edge.weight))))
         }
         // Projects and hubs push harder than satellites, so labels get room.
@@ -189,7 +190,7 @@ public enum MapLayout {
                 force[b] += pull
             }
             for i in nodes.indices {
-                force[i] -= position[i] * 0.4 * k   // gravity keeps islands in view
+                force[i] -= position[i] * 1.2 * k   // gravity keeps islands close, so the map isn't mostly gaps
                 let length = max(1e-9, (force[i] * force[i]).sum().squareRoot())
                 position[i] += force[i] / length * min(length, temperature)
             }
@@ -199,6 +200,29 @@ public enum MapLayout {
         let xs = position.map(\.x), ys = position.map(\.y)
         let minimum = SIMD2(xs.min()!, ys.min()!)
         let span = SIMD2(max(1e-6, xs.max()! - minimum.x), max(1e-6, ys.max()! - minimum.y))
-        return Dictionary(uniqueKeysWithValues: nodes.indices.map { (nodes[$0].id, (position[$0] - minimum) / span * 0.92 + 0.04) })
+        var fitted = position.map { ($0 - minimum) / span * 0.92 + 0.04 }
+        // Project labels sit under their dots and are wide: nudge apart any two that would overlap.
+        // A project's files move with it.
+        let projects = nodes.indices.filter { nodes[$0].kind == .project }
+        var satellites: [Int: [Int]] = [:]
+        for edge in map.edges where edge.kind == .contains {
+            if let a = index[edge.from], let b = index[edge.to] { satellites[a, default: []].append(b) }
+        }
+        func shift(_ i: Int, by x: Double) { for j in [i] + satellites[i, default: []] { fitted[j].x += x } }
+        for _ in 0..<60 {
+            var moved = false
+            for (n, a) in projects.enumerated() {
+                for b in projects[(n + 1)...] {
+                    let dx = fitted[b].x - fitted[a].x, dy = fitted[b].y - fitted[a].y
+                    guard abs(dx) < 0.13, abs(dy) < 0.13 else { continue }   // the label hangs below the dot
+                    let push = (0.13 - abs(dx)) / 2 * (dx < 0 ? -1 : 1)
+                    shift(a, by: -push)
+                    shift(b, by: push)
+                    moved = true
+                }
+            }
+            if !moved { break }
+        }
+        return Dictionary(uniqueKeysWithValues: nodes.indices.map { (nodes[$0].id, fitted[$0].clamped(lowerBound: SIMD2(repeating: 0.02), upperBound: SIMD2(repeating: 0.98))) })
     }
 }

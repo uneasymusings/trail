@@ -138,9 +138,11 @@ struct MapView: View {
             }
             if let map = model.map {
                 let count = { (kind: GraphMap.NodeKind) in map.nodes.filter { $0.kind == kind }.count }
-                Text("\(count(.project)) projects · \(count(.file)) files · \(count(.topic)) topics · \(count(.source)) sources · \(map.edges.count) links")
+                let counted = { (n: Int, noun: String) in "\(n) \(noun)\(n == 1 ? "" : "s")" }
+                Text([counted(count(.project), "project"), counted(count(.file), "file"), counted(count(.topic), "topic"),
+                      counted(count(.source), "source"), counted(map.edges.count, "link")].joined(separator: " · "))
                     .font(Theme.mono(11))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary.opacity(0.55))
             }
         }
     }
@@ -168,10 +170,10 @@ struct MapView: View {
 
     private func radius(_ node: GraphMap.Node) -> CGFloat {
         switch node.kind {
-        case .project: 5 + min(13, 2.6 * log(Double(max(1, node.weight))))
-        case .file: 2.4
-        case .topic: 3.5 + CGFloat(min(4, node.weight)) * 0.6
-        case .source: 3.5
+        case .project: 6 + min(13, 2.8 * log(Double(max(1, node.weight))))
+        case .file: 3
+        case .topic: 4 + CGFloat(min(4, node.weight)) * 0.6
+        case .source: 4
         }
     }
 
@@ -203,7 +205,7 @@ struct MapView: View {
                 path.addLine(to: b)
             }
             let strength = min(1, 0.35 + log(Double(edge.weight)) * 0.2)
-            let base = switch edge.kind { case .together: 0.34; case .contains: 0.14; case .topic: 0.18; case .source: 0.16 }
+            let base = switch edge.kind { case .together: 0.6; case .contains: 0.3; case .topic: 0.36; case .source: 0.3 }
             let opacity = base * strength * min(visible(edge.from), visible(edge.to))
             context.stroke(path, with: .color(.primary.opacity(opacity)),
                            style: StrokeStyle(lineWidth: edge.kind == .together ? 1.4 : 0.8, dash: edge.kind == .source ? [2, 3] : []))
@@ -235,20 +237,24 @@ struct MapView: View {
                 }
             case .topic:
                 context.stroke(Circle().path(in: rect), with: .color(isHovered ? .accentColor : .secondary.opacity(alpha)), lineWidth: 1.2)
-                if focus != nil && alpha == 1 || map.nodes.count < 40 {
+                do {
                     context.draw(Text(node.name).font(Theme.mono(10)).foregroundStyle(.secondary.opacity(alpha)),
                                  at: CGPoint(x: center.x + r + 5, y: center.y), anchor: .leading)
                 }
             case .source:
                 context.stroke(RoundedRectangle(cornerRadius: 1.5).path(in: rect), with: .color(isHovered ? .accentColor : .secondary.opacity(alpha * 0.8)), lineWidth: 1)
                 if focus != nil && alpha == 1 {
-                    context.draw(Text(node.name).font(Theme.mono(10)).foregroundStyle(.tertiary),
+                    context.draw(Text(node.name).font(Theme.mono(9.5)).foregroundStyle(.tertiary),
                                  at: CGPoint(x: center.x + r + 5, y: center.y), anchor: .leading)
                 }
             }
         }
 
         if let hovered = model.hovered, let node = map.nodes.first(where: { $0.id == hovered }), let center = point(hovered, in: frame) {
+            if node.kind == .project {
+                drawCard(for: node, at: center, in: &context, frame: frame, map: map)
+                return
+            }
             let detail: String = switch node.kind {
             case .project: "\(node.weight) files" + (node.lastActive.map { " · active \(Theme.age($0))" } ?? "")
             case .file: node.lastActive.map { "edited \(Theme.age($0))" } ?? ""
@@ -257,6 +263,23 @@ struct MapView: View {
             }
             context.draw(Text(detail).font(Theme.mono(10)).foregroundStyle(.secondary),
                          at: CGPoint(x: center.x, y: center.y - radius(node) - 8), anchor: .bottom)
+        }
+    }
+}
+
+extension MapView {
+    /// A hovered project lists its newest files beside it, rather than labelling each dot.
+    private func drawCard(for node: GraphMap.Node, at center: CGPoint, in context: inout GraphicsContext, frame: CGRect, map: GraphMap) {
+        let files = map.edges.filter { $0.from == node.id && $0.kind == .contains }
+            .compactMap { edge in map.nodes.first { $0.id == edge.to } }
+        let detail = "\(node.weight) files" + (node.lastActive.map { " · active \(Theme.age($0))" } ?? "")
+        let lines: [Text] = [Text(detail).font(Theme.mono(10)).foregroundStyle(.secondary)]
+            + files.map { Text($0.name).font(.system(size: 11)).foregroundStyle(.primary.opacity(0.85)) }
+        let onRight = center.x < frame.midX + frame.width * 0.2
+        let x = onRight ? center.x + radius(node) + 34 : center.x - radius(node) - 34
+        let top = center.y - CGFloat(lines.count - 1) * 8
+        for (index, line) in lines.enumerated() {
+            context.draw(line, at: CGPoint(x: x, y: top + CGFloat(index) * 16), anchor: onRight ? .leading : .trailing)
         }
     }
 }

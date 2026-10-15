@@ -47,10 +47,10 @@ A small model runs on your Mac (Apple's on-device Foundation Model). It reads yo
     </td>
   </tr>
   <tr>
-    <td><img src="docs/media/map.gif" alt="The map: projects with their newest files, shared topics and download sources; hovering a project lights up its neighbours"></td>
+    <td><img src="docs/media/map.gif" alt="The map: projects with their newest files, shared topics and download sources; hovering a project lights up its neighbours and lists its newest files"></td>
     <td>
       <b>See the graph.</b><br>
-      The Map shows your active projects and their newest files, and the topics they share. It also shows the sites your downloads came from, and which projects you work on together. Hover a project to see what it touches, click to open it.
+      The Map shows your active projects and their newest files, and the topics they share. It also shows the sites your downloads came from, and which projects you work on together. Hover a project to light up what it touches and list its newest files. Click to open it.
     </td>
   </tr>
   <tr>
