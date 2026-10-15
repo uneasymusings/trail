@@ -32,7 +32,7 @@ final class AppModel {
     func start() {
         do {
             let engine = try TrailEngine.open()
-            engine.snapshotURL = Self.widgetSnapshotURL
+            engine.snapshotURL = DemoDirector.isActive ? nil : Self.widgetSnapshotURL
             engine.onChange = { [weak self] in self?.engineChanged() }
             self.engine = engine
             config = engine.config
@@ -119,6 +119,7 @@ final class AppModel {
 
     /// The TCC database is readable only with Full Disk Access.
     static func checkFullDiskAccess() -> Bool {
+        if DemoDirector.isActive { return true }
         let path = NSHomeDirectory() + "/Library/Application Support/com.apple.TCC/TCC.db"
         let descriptor = Darwin.open(path, O_RDONLY)
         guard descriptor != -1 else { return false }

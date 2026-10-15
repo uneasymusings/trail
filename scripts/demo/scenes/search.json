@@ -1,0 +1,11 @@
+{ "steps": [
+  { "wait": 5.5, "show": true },
+  { "wait": 2.8, "type": "latest pitch deck for thermal" },
+  { "wait": 3.0, "key": "down" },
+  { "wait": 0.5, "key": "down" },
+  { "wait": 0.5, "key": "up" },
+  { "wait": 0.5, "key": "up" },
+  { "wait": 0.7, "key": "tab" },
+  { "wait": 2.8, "key": "tab" },
+  { "wait": 0.8, "hide": true }
+] }

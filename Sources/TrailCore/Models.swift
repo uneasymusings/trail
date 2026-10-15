@@ -145,7 +145,7 @@ public struct FileRecord: Identifiable, Hashable, Codable, Sendable {
 
     /// The path with the home directory shortened to `~`.
     public var displayPath: String {
-        let home = NSHomeDirectory()
+        let home = TrailPaths.home
         let parent = (path as NSString).deletingLastPathComponent
         return parent.hasPrefix(home) ? "~" + parent.dropFirst(home.count) : parent
     }

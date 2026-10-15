@@ -7,6 +7,8 @@ import SwiftUI
 final class ToastController {
     private var panel: NSPanel?
     private var dismissTask: Task<Void, Never>?
+    /// When set (demo recordings), the note is centered in this rect instead of sitting under the menu bar.
+    var anchor: NSRect?
 
     static let size = NSSize(width: 320, height: 96)
 
@@ -25,7 +27,9 @@ final class ToastController {
         })
 
         let screen = NSScreen.main ?? NSScreen.screens.first
-        if let frame = screen?.visibleFrame {
+        if let anchor {
+            panel.setFrameOrigin(NSPoint(x: anchor.midX - Self.size.width / 2, y: anchor.midY - Self.size.height / 2))
+        } else if let frame = screen?.visibleFrame {
             panel.setFrameOrigin(NSPoint(x: frame.maxX - Self.size.width - 12, y: frame.maxY - Self.size.height - 8))
         }
         panel.alphaValue = 0

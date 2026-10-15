@@ -7,3 +7,4 @@ dist/
 App/Trail.xcodeproj/
 App/Config/Local.xcconfig
 .DS_Store
+.demo/

@@ -31,7 +31,7 @@ struct DecodeText: View {
         let revealed = Int(Double(characters.count) * progress)
         let tick = Int(date.timeIntervalSinceReferenceDate * 30)
         return String(characters.enumerated().map { index, character in
-            index < revealed || character == " " ? character : Self.noise[(index * 7 + tick) % Self.noise.count]
+            index < revealed || character == " " ? character : Self.noise[(index * index + index * 3 + tick) % Self.noise.count]
         })
     }
 }

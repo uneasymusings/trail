@@ -45,6 +45,14 @@ public final class TrailEngine: @unchecked Sendable {
         self.search = SearchEngine(db: db)
     }
 
+    /// Refills the search index if a schema migration replaced it. `start()` does this in the
+    /// background; the CLI calls it directly.
+    public func prepareSearchIndex() {
+        guard (try? indexer.rebuildSearchIfNeeded()) == true else { return }
+        try? db.exec("VACUUM; PRAGMA wal_checkpoint(TRUNCATE);")   // the old index's pages are free now
+        releaseMemory()
+    }
+
     public var hasCompletedFirstScan: Bool { db.meta("backfill_done") != nil }
 
     /// Records a scan done outside `start()` so the next start replays changes from `eventID`.
@@ -64,12 +72,14 @@ public final class TrailEngine: @unchecked Sendable {
 
         // The first scan runs at background priority (efficiency cores only) so it stays out of the way.
         indexQueue.async(qos: needsScan ? .background : .utility, flags: .enforceQoS) { [self] in
+            prepareSearchIndex()
             if needsScan {
                 setPhase(.scanning(indexed: 0))
                 _ = try? indexer.backfill(days: config.backfillDays) { [weak self] count, _ in
                     self?.setPhase(.scanning(indexed: count))
                 }
                 db.setMeta("backfill_done", ISO8601DateFormatter().string(from: Date()))
+                try? compact()      // reclaim the space the scan churned through
             }
             try? indexer.prune()
             setPhase(.watching)
@@ -102,10 +112,18 @@ public final class TrailEngine: @unchecked Sendable {
     }
 
     /// Collapses bulky generated folder trees and reclaims disk space.
+    /// The first scan builds large caches it won't need again; let them go.
+    func releaseMemory() {
+        indexer.resolver.invalidate()
+        db.releaseMemory()
+        malloc_zone_pressure_relief(nil, 0)
+    }
+
     public func compact() throws {
         try indexer.collapseLargeTrees()
         try indexer.prune()
         try db.exec("VACUUM; PRAGMA wal_checkpoint(TRUNCATE);")
+        releaseMemory()
     }
 
     /// Forgets everything and scans again.

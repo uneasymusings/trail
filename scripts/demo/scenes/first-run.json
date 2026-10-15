@@ -1,0 +1,5 @@
+{ "steps": [
+  { "wait": 5.5, "toast": "first-run" },
+  { "wait": 4.2, "toast": "map-ready" },
+  { "wait": 4.0 }
+] }

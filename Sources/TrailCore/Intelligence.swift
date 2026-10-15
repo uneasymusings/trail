@@ -67,9 +67,8 @@ public final class Intelligence: @unchecked Sendable {
             let output = try await session.respond(to: quick.text, generating: PlanOutput.self,
                                                    options: GenerationOptions(temperature: 0)).content
             var plan = quick
-            let keywords = output.keywords
-                .flatMap { $0.lowercased().split(separator: " ").map(String.init) }
-                .filter { !QueryParser.stopWords.contains($0) && !QueryParser.newestWords.contains($0) && $0.count > 1 }
+            let words: [String] = output.keywords.flatMap { $0.lowercased().split(separator: " ").map(String.init) }
+            let keywords = words.filter(Self.isSearchWord)
             if !keywords.isEmpty { plan.keywords = Array(NSOrderedSet(array: keywords)) as? [String] ?? keywords }
             if plan.kinds.isEmpty, let kind = Self.kind(output.kind) { plan.kinds = [kind] }
             if plan.timeframe == .any, let timeframe = Timeframe(rawValue: output.timeframe), timeframe != .any,
@@ -84,6 +83,12 @@ public final class Intelligence: @unchecked Sendable {
         } catch {
             return nil
         }
+    }
+
+    /// Drops filler and kind words ("pdfs", "deck") the model sometimes keeps as keywords.
+    private static func isSearchWord(_ word: String) -> Bool {
+        guard word.count > 1, !QueryParser.stopWords.contains(word), !QueryParser.newestWords.contains(word) else { return false }
+        return QueryParser.kindWords[word] == nil || QueryParser.kindWordsKeptAsKeywords.contains(word)
     }
 
     private static func kind(_ value: String) -> FileKind? {

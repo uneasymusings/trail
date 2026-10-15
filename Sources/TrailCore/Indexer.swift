@@ -12,7 +12,7 @@ public final class Indexer: @unchecked Sendable {
     /// How long a run of saves to the same file counts as one "modified" event.
     static let eventWindow: TimeInterval = 10 * 60
 
-    init(db: Database, rules: ScopeRules, home: String = NSHomeDirectory()) {
+    init(db: Database, rules: ScopeRules, home: String = TrailPaths.home) {
         self.db = db
         self.rules = rules
         self.resolver = ProjectResolver(home: home)
@@ -503,6 +503,18 @@ public final class Indexer: @unchecked Sendable {
     // MARK: - Search index
 
     /// Rewrites the full-text row for a file from what's stored about it.
+    /// Refills the full-text index after a migration replaced it. Returns whether it did.
+    @discardableResult
+    func rebuildSearchIfNeeded() throws -> Bool {
+        guard db.meta("search_rebuild") != nil else { return false }
+        let ids = try db.query("SELECT id FROM files").compactMap { $0.int("id") }
+        try db.transaction {
+            for id in ids { try refreshSearch(id) }
+            try db.run("DELETE FROM meta WHERE key = 'search_rebuild'")
+        }
+        return true
+    }
+
     func refreshSearch(_ id: Int) throws {
         guard let row = try db.query("SELECT \(fileColumns) FROM files f LEFT JOIN projects p ON p.id = f.project_id WHERE f.id = ?", id).first else { return }
         let file = FileRecord(row: row)

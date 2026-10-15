@@ -26,7 +26,7 @@ public struct ScopeRules: Sendable {
         "appex", "dsym", "nib", "storyboardc", "scnassets", "pkg", "mpkg", "scriptd",
     ]
 
-    public init(config: TrailConfig, home: String = NSHomeDirectory()) {
+    public init(config: TrailConfig, home: String = TrailPaths.home) {
         self.home = home
         let expand = { (path: String) in
             (path == "~" ? home : path.hasPrefix("~/") ? home + path.dropFirst(1) : path).trimmingTrailingSlash

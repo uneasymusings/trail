@@ -8,11 +8,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotKey: HotKey?
     private let toast = ToastController()
 
+    private var demo: DemoDirector?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         model.start()
         let panel = SearchPanelController(model: model)
         self.panel = panel
+
+        if DemoDirector.isActive {
+            demo = DemoDirector(panel: panel, toast: toast, model: model)
+            demo?.run()
+            return
+        }
         registerHotKey()
         model.onHotKeyChange = { [weak self] in self?.registerHotKey() }
 
