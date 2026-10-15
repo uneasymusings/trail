@@ -93,7 +93,8 @@ public enum QueryParser {
         "written", "touched", "version", "versions", "thing", "things", "stuff", "one", "ones", "all", "any",
         "some", "just", "again", "ago", "time", "day", "days", "week", "month", "year", "lately", "where's",
         "folder", "where'd", "put", "look", "looking", "see", "need", "want", "let", "lets", "let's", "im", "i'm",
-        "downloaded", "download", "downloads", "ai", "generated", "llm", "by", "was", "that's", "was",
+        "downloaded", "download", "downloads", "ai", "generated", "llm", "that's",
+        "today", "yesterday", "tonight", "morning", "afternoon", "evening", "weekend", "now",
     ]
 
     public static func parse(_ text: String) -> QueryPlan {

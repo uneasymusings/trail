@@ -1,7 +1,7 @@
 import Foundation
 
 enum Schema {
-    static let version = 1
+    static let version = 2
 
     /// The knowledge graph: files, projects, tags and activity events, plus a full-text index.
     /// Edges are columns (`project_id`, `chain_id`) and join tables (`file_tags`) rather than a
@@ -66,16 +66,29 @@ enum Schema {
 
         CREATE VIRTUAL TABLE IF NOT EXISTS search USING fts5(
             name, terms, summary, tags, project,
-            tokenize = "unicode61 remove_diacritics 2"
+            tokenize = "porter unicode61 remove_diacritics 2"
         );
+        """
+
+    /// v2: English stemming in the search index, so "taxes" finds "tax" and "flights" finds "flight".
+    static let v2 = """
+        DROP TABLE IF EXISTS search;
+        CREATE VIRTUAL TABLE search USING fts5(
+            name, terms, summary, tags, project,
+            tokenize = "porter unicode61 remove_diacritics 2"
+        );
+        INSERT INTO meta (key, value) VALUES ('search_rebuild', '1')
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value;
         """
 
     static func migrate(_ db: Database) throws {
         let current = try db.scalarInt("PRAGMA user_version") ?? 0
         if current < 1 {
             try db.exec(v1)
-            try db.exec("PRAGMA user_version = \(version)")
+        } else if current < 2 {
+            try db.exec(v2)
         }
+        if current < version { try db.exec("PRAGMA user_version = \(version)") }
     }
 }
 

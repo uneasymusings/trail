@@ -122,6 +122,30 @@ import Testing
         Indexer(db: sandbox.engine.db, rules: ScopeRules(config: sandbox.engine.config, home: sandbox.home), home: sandbox.home)
     }
 
+    @Test func migrationAddsStemmingToAnOldIndex() throws {
+        let box = try Sandbox()
+        try box.write("Documents/Money/tax-summary.md", "totals")
+        let indexer = makeIndexer(box)
+        try indexer.backfill(days: 30)
+        let search = box.engine.search
+        #expect(try search.search(QueryParser.parse("taxes")).hits.first?.file.name == "tax-summary.md")
+
+        // Recreate a v1 index, which had no stemming.
+        let db = box.engine.db
+        try db.exec("""
+            DROP TABLE search;
+            CREATE VIRTUAL TABLE search USING fts5(name, terms, summary, tags, project, tokenize = "unicode61 remove_diacritics 2");
+            PRAGMA user_version = 1;
+            """)
+        for row in try db.query("SELECT id FROM files") { try indexer.refreshSearch(row.int("id")!) }
+        #expect(try search.search(QueryParser.parse("taxes")).hits.isEmpty)
+
+        try Schema.migrate(db)
+        try indexer.rebuildSearchIfNeeded()
+        #expect(try db.scalarInt("PRAGMA user_version") == Schema.version)
+        #expect(try search.search(QueryParser.parse("taxes")).hits.first?.file.name == "tax-summary.md")
+    }
+
     @Test func scanLinksVersionsAndProjects() throws {
         let box = try Sandbox()
         try box.write("Documents/Thermal/Pitch v1.md", "first", modified: Date().addingTimeInterval(-86_400 * 3))

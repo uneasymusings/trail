@@ -22,7 +22,8 @@ public struct TrailConfig: Codable, Sendable, Equatable {
     public var expandedExclusions: [String] { excludedPaths.map(Self.expand) }
 
     static func expand(_ path: String) -> String {
-        (path as NSString).expandingTildeInPath.trimmingTrailingSlash
+        let expanded = path == "~" || path.hasPrefix("~/") ? TrailPaths.home + path.dropFirst() : path
+        return expanded.trimmingTrailingSlash
     }
 
     public static func load(from url: URL) -> TrailConfig {
@@ -39,6 +40,15 @@ public struct TrailConfig: Codable, Sendable, Equatable {
 }
 
 public enum TrailPaths {
+    /// The home folder Trail treats as `~`. `TRAIL_USER_HOME` swaps in another folder,
+    /// which is how the demo recordings run against made-up files.
+    public static let home: String = {
+        if let override = ProcessInfo.processInfo.environment["TRAIL_USER_HOME"], !override.isEmpty {
+            return URL(fileURLWithPath: override).standardizedFileURL.resolvingSymlinksInPath().path
+        }
+        return NSHomeDirectory()
+    }()
+
     /// `TRAIL_HOME` overrides the data folder (used by tests and for trying things out).
     public static var dataDirectory: URL {
         if let override = ProcessInfo.processInfo.environment["TRAIL_HOME"] {

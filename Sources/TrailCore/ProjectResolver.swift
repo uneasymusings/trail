@@ -33,7 +33,7 @@ final class ProjectResolver: @unchecked Sendable {
         "Movies", "Music", "Public", "Shared drives", "Experiments",
     ]
 
-    init(home: String = NSHomeDirectory()) {
+    init(home: String = TrailPaths.home) {
         self.home = home
     }
 
@@ -49,7 +49,7 @@ final class ProjectResolver: @unchecked Sendable {
         let result = codeProject(from: folder) ?? folderProject(for: folder)
 
         lock.lock()
-        if cache.count > 50_000 { cache.removeAll(keepingCapacity: true) }
+        if cache.count > 50_000 { cache.removeAll() }
         cache[folder] = result
         lock.unlock()
         return result
@@ -83,7 +83,7 @@ final class ProjectResolver: @unchecked Sendable {
             git: names.contains(".git")
         )
         lock.lock()
-        if markerCache.count > 100_000 { markerCache.removeAll(keepingCapacity: true) }
+        if markerCache.count > 100_000 { markerCache.removeAll() }
         markerCache[folder] = result
         lock.unlock()
         return result

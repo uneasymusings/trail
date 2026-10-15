@@ -1,0 +1,7 @@
+{ "steps": [
+  { "wait": 5.5, "show": true },
+  { "wait": 2.4, "type": "pdfs I downloaded about taxes" },
+  { "wait": 3.4, "clear": true },
+  { "wait": 0.4, "type": "what was I working on today?" },
+  { "wait": 5.5, "hide": true }
+] }

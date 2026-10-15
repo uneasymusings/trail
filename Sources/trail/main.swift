@@ -29,6 +29,7 @@ let rest = arguments.dropFirst().joined(separator: " ")
 let engine: TrailEngine
 do {
     engine = try TrailEngine.open()
+    engine.prepareSearchIndex()
 } catch {
     FileHandle.standardError.write("trail: \(error)\n".data(using: .utf8)!)
     exit(1)

@@ -136,6 +136,12 @@ public final class Database: @unchecked Sendable {
         }
     }
 
+    /// Hands SQLite's page cache back to the system. The cache refills as needed.
+    public func releaseMemory() {
+        lock.lock(); defer { lock.unlock() }
+        if let handle { sqlite3_db_release_memory(handle) }
+    }
+
     private func prepare(_ sql: String, _ args: [Any?]) throws -> OpaquePointer {
         let statement: OpaquePointer
         if let cached = statements[sql] {

@@ -26,7 +26,9 @@ final class SearchPanel: NSPanel {
 @MainActor
 final class SearchPanelController: NSObject, NSWindowDelegate {
     private let panel: SearchPanel
-    private let search: SearchModel
+    let search: SearchModel
+    /// When set (demo recordings), the panel sits near the top of this rect instead of following the pointer.
+    var anchor: NSRect?
     private var mouseMonitor: Any?
 
     static let size = NSSize(width: 660, height: 560)
@@ -52,12 +54,12 @@ final class SearchPanelController: NSObject, NSWindowDelegate {
         isVisible ? hide() : show()
     }
 
-    func show(query: String? = nil) {
+    func show(query: String? = nil, takeFocus: Bool = true) {
         if let query { search.query = query }
         search.prepare()
         position()
         panel.alphaValue = 0
-        panel.makeKeyAndOrderFront(nil)
+        if takeFocus { panel.makeKeyAndOrderFront(nil) } else { panel.orderFrontRegardless() }
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.12
             panel.animator().alphaValue = 1
@@ -79,6 +81,11 @@ final class SearchPanelController: NSObject, NSWindowDelegate {
 
     /// Centered on the screen with the pointer, a little above the middle.
     private func position() {
+        if let anchor {
+            panel.setFrame(NSRect(x: anchor.midX - Self.size.width / 2, y: anchor.maxY - 50 - Self.size.height,
+                                  width: Self.size.width, height: Self.size.height), display: true)
+            return
+        }
         let mouse = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main
         guard let frame = screen?.visibleFrame else { return }
