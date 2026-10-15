@@ -1,0 +1,85 @@
+name: Trail
+options:
+  bundleIdPrefix: io.github.uneasymusings
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+configFiles:
+  Debug: Config/Signing.xcconfig
+  Release: Config/Signing.xcconfig
+
+packages:
+  TrailCore:
+    path: ..
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_HARDENED_RUNTIME: YES
+    DEAD_CODE_STRIPPING: YES
+
+targets:
+  Trail:
+    type: application
+    platform: macOS
+    sources:
+      - path: Trail
+    dependencies:
+      - package: TrailCore
+      - target: TrailWidget
+        embed: true
+    info:
+      path: Trail/Info.plist
+      properties:
+        CFBundleDisplayName: Trail
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSUIElement: true
+        LSApplicationCategoryType: public.app-category.productivity
+        NSHumanReadableCopyright: MIT License
+        TrailAppGroup: $(TRAIL_APP_GROUP)
+        CFBundleURLTypes:
+          - CFBundleURLName: Trail
+            CFBundleURLSchemes: [trail]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.uneasymusings.Trail
+        CODE_SIGN_ENTITLEMENTS: $(TRAIL_APP_ENTITLEMENTS)
+        PRODUCT_NAME: Trail
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_KEY_LSUIElement: YES
+
+  TrailWidget:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: TrailWidget
+      - path: ../Sources/TrailCore/WidgetSnapshot.swift
+    info:
+      path: TrailWidget/Info.plist
+      properties:
+        CFBundleDisplayName: Trail
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        TrailAppGroup: $(TRAIL_APP_GROUP)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.uneasymusings.Trail.Widget
+        CODE_SIGN_ENTITLEMENTS: $(TRAIL_WIDGET_ENTITLEMENTS)
+        PRODUCT_NAME: TrailWidget
+
+schemes:
+  Trail:
+    build:
+      targets:
+        Trail: all
+    run:
+      config: Debug
+    archive:
+      config: Release

@@ -1,0 +1,9 @@
+.build/
+build/
+dist/
+.swiftpm/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+App/Trail.xcodeproj/
+App/Config/Local.xcconfig
+.DS_Store
