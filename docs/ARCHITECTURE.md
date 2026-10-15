@@ -191,7 +191,7 @@ Once you've been away from the keyboard and mouse for a minute, the engine takes
 - pptx and xlsx: text runs from their zip archives;
 - images: Vision's fast text recognition.
 
-Images are scaled down to 2,048 px before OCR. Vision keeps its text-recognition model (about 200 MB) in memory until it has been idle for a few seconds, so after a batch with images the engine waits 20 s instead of 2 s, and the memory is returned between batches.
+Images are scaled down to 2,048 px before OCR. Vision keeps its text-recognition model (about 200 MB) in memory until it has been idle for a few seconds, so after a batch with images the engine waits 20 s instead of 2 s, and the memory is returned between batches. After each batch the engine also hands freed heap back to the system (`malloc_zone_pressure_relief`): PDFKit and the model session leave a lot behind. That took the footprint between batches from about 110 MB to about 70 MB.
 
 `Intelligence.note` returns a one-sentence summary and up to 5 tags. That takes about 1.5 s per file. Tags longer than 30 characters or containing `/` are thrown away, because the model sometimes returns paths. Notes feed the full-text index, so a file can be found by what's in it.
 
