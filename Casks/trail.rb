@@ -2,8 +2,8 @@
 #   brew install --cask uneasymusings/trail/trail
 # Update version and sha256 (shasum -a 256 Trail-x.y.z.dmg) for each release.
 cask "trail" do
-  version "0.2.0"
-  sha256 "fdc761e96ca997cbe90725f22749808b1934afa4c15396acd39fdbfbcd3efa5e"
+  version "0.3.0"
+  sha256 "30484bd892440dc4a85222ad714087ab038984641366ad351aed51f779550419"
 
   url "https://github.com/uneasymusings/trail/releases/download/v#{version}/Trail-#{version}.dmg"
   name "Trail"
