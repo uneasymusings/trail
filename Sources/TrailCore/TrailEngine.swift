@@ -393,6 +393,9 @@ public final class TrailEngine: @unchecked Sendable {
             try? await Task.sleep(for: .milliseconds(400))
         }
         notify()
+        // PDFKit, Vision and the model session leave freed memory behind; hand it back.
+        db.releaseMemory()
+        malloc_zone_pressure_relief(nil, 0)
         return readImages ? 20 : 2
     }
 

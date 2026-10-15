@@ -238,7 +238,7 @@ Measured on a developer's MacBook Pro (M-series) with a busy home folder:
 | Reading documents | about 4,700 documents in a few minutes, in the background, once |
 | Notes | about 1.5 s per file, only after a minute away from the keyboard, never on low power |
 | App size | 7 MB |
-| Memory | 31 MB footprint while watching; about 230 MB for a few seconds at a time while it reads text in screenshots |
+| Memory | 31 MB footprint while you're working; 65–75 MB while it writes notes when you're away, peaking near 250 MB for a few seconds while it reads text in screenshots |
 
 ## Privacy
 
